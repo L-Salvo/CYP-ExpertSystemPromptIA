@@ -1,5 +1,7 @@
 package com.cyp.prompt.expert_backend.dto.response;
 
+import com.cyp.prompt.expert_backend.enums.SkillCategory;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -15,6 +17,6 @@ public record SkillCatalogResponse(
         @Schema(description = "Nombre de la skill", example = "Java")
         String name,
 
-        @Schema(description = "Categoría de la skill", example = "backend")
-        String category
+        @Schema(description = "Categoría de la skill", example = "BACKEND")
+        SkillCategory category
 ) {}

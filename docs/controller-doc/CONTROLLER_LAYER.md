@@ -181,7 +181,7 @@ Skill del catálogo global. Usada en `GET /api/skills`. No incluye `level` (el n
 |---|---|
 | `skillId` | `Long` |
 | `name` | `String` |
-| `category` | `String` |
+| `category` | `SkillCategory` (enum serializado como `String` en JSON: `BACKEND`, `FRONTEND`, `DATABASE`, `DEVOPS`, `CLOUD`, `PROGRAMMING_LANGUAGE`, `OTHER`) |
 
 ### `ChatResponse`
 
@@ -288,7 +288,7 @@ Estructura estándar de error para todos los endpoints.
 
 | Método | Path | Descripción | Query params | Response | Códigos HTTP |
 |---|---|---|---|---|---|
-| `GET` | `/api/skills` | Listar catálogo de skills | `category` (opcional) | `List<SkillCatalogResponse>` | 200 |
+| `GET` | `/api/skills` | Listar catálogo de skills | `category` (opcional, `String`; el `SkillService` lo normaliza a `SkillCategory` con `toUpperCase`) | `List<SkillCatalogResponse>` | 200 |
 
 ---
 

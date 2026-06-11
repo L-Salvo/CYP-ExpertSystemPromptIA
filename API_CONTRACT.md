@@ -160,7 +160,7 @@ Obtener el catálogo completo de skills disponibles en el sistema.
 | **Método** | `GET` |
 | **URL** | `/api/skills` |
 | **Path params** | — |
-| **Query params** | `category` (opcional) — filtrar por categoría |
+| **Query params** | `category` (opcional) — filtrar por categoría (ver `SkillCategory`) |
 
 **Response body** `200 OK`
 
@@ -169,26 +169,33 @@ Obtener el catálogo completo de skills disponibles en el sistema.
   {
     "skillId": 1,
     "name": "Java",
-    "category": "backend"
+    "category": "BACKEND"
   },
   {
     "skillId": 2,
     "name": "React",
-    "category": "frontend"
+    "category": "FRONTEND"
   },
   {
     "skillId": 3,
     "name": "Docker",
-    "category": "devops"
+    "category": "DEVOPS"
   }
 ]
 ```
+
+**Sobre el query param `category`:**
+
+- Acepta el nombre del enum en cualquier capitalización (`backend`, `BACKEND`, `Backend`). La capa de servicio lo normaliza con `toUpperCase()` antes de buscar en la base.
+- Si el valor no corresponde a ningún miembro de `SkillCategory`, la respuesta es `400 Bad Request`. Se interpreta como parámetro inválido, no como ausencia de resultados.
+- Valores válidos: `BACKEND`, `FRONTEND`, `DATABASE`, `DEVOPS`, `CLOUD`, `PROGRAMMING_LANGUAGE`, `OTHER`.
 
 **Códigos HTTP**
 
 | Código | Descripción |
 |---|---|
 | `200` | Catálogo obtenido correctamente |
+| `400` | Valor de `category` no reconocido (no pertenece a `SkillCategory`) |
 
 ---
 

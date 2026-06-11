@@ -1,6 +1,7 @@
 package com.cyp.prompt.expert_backend.controller;
 
 import com.cyp.prompt.expert_backend.dto.response.SkillCatalogResponse;
+import com.cyp.prompt.expert_backend.enums.SkillCategory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -31,9 +32,9 @@ public class SkillController {
     ) {
         // TODO: implementar con SkillService
         List<SkillCatalogResponse> mock = List.of(
-                new SkillCatalogResponse(1L, "Java", "backend"),
-                new SkillCatalogResponse(2L, "React", "frontend"),
-                new SkillCatalogResponse(3L, "Docker", "devops")
+                new SkillCatalogResponse(1L, "Java", SkillCategory.BACKEND),
+                new SkillCatalogResponse(2L, "React", SkillCategory.FRONTEND),
+                new SkillCatalogResponse(3L, "Docker", SkillCategory.DEVOPS)
         );
         return ResponseEntity.ok(mock);
     }
