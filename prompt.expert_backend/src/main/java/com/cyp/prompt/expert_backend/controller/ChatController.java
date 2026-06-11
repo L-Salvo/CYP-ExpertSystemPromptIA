@@ -5,6 +5,7 @@ import com.cyp.prompt.expert_backend.dto.request.RenameChatRequest;
 import com.cyp.prompt.expert_backend.dto.response.ChatDetailResponse;
 import com.cyp.prompt.expert_backend.dto.response.ChatResponse;
 import com.cyp.prompt.expert_backend.dto.response.RenameChatResponse;
+import com.cyp.prompt.expert_backend.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -13,16 +14,22 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.List;
 
 @Tag(name = "Chats", description = "Gestión de chats del usuario")
 @RestController
 @RequestMapping("/api/chats")
+@RequiredArgsConstructor
 public class ChatController {
+
+    // Sustituir por SecurityContext cuando se implemente autenticación
+    private static final Long FIXED_USER_ID = 1L;
+
+    private final ChatService chatService;
 
     @Operation(
             summary = "Crear chat",
@@ -33,15 +40,7 @@ public class ChatController {
     @ApiResponse(responseCode = "400", description = "Request inválido")
     @PostMapping
     public ResponseEntity<ChatResponse> createChat(@Valid @RequestBody CreateChatRequest request) {
-        // TODO: implementar con ChatService
-        ChatResponse mock = new ChatResponse(
-                12L,
-                request.title(),
-                0,
-                Instant.now(),
-                Instant.now()
-        );
-        return ResponseEntity.status(201).body(mock);
+        return ResponseEntity.status(201).body(chatService.createChat(FIXED_USER_ID, request));
     }
 
     @Operation(
@@ -52,14 +51,7 @@ public class ChatController {
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = ChatResponse.class))))
     @GetMapping
     public ResponseEntity<List<ChatResponse>> getChats() {
-        // TODO: implementar con ChatService
-        List<ChatResponse> mock = List.of(
-                new ChatResponse(12L, "Aprendiendo Docker", 4,
-                        Instant.parse("2026-06-10T14:00:00Z"), Instant.parse("2026-06-10T15:30:00Z")),
-                new ChatResponse(8L, "Spring Boot con JPA", 7,
-                        Instant.parse("2026-06-08T09:00:00Z"), Instant.parse("2026-06-09T11:00:00Z"))
-        );
-        return ResponseEntity.ok(mock);
+        return ResponseEntity.ok(chatService.getChats(FIXED_USER_ID));
     }
 
     @Operation(
@@ -74,15 +66,7 @@ public class ChatController {
             @Parameter(description = "ID del chat", required = true)
             @PathVariable Long chatId
     ) {
-        // TODO: implementar con ChatService
-        ChatDetailResponse mock = new ChatDetailResponse(
-                chatId,
-                "Aprendiendo Docker",
-                Instant.parse("2026-06-10T14:00:00Z"),
-                Instant.parse("2026-06-10T15:30:00Z"),
-                List.of()
-        );
-        return ResponseEntity.ok(mock);
+        return ResponseEntity.ok(chatService.getChatById(FIXED_USER_ID, chatId));
     }
 
     @Operation(
@@ -99,9 +83,7 @@ public class ChatController {
             @PathVariable Long chatId,
             @Valid @RequestBody RenameChatRequest request
     ) {
-        // TODO: implementar con ChatService
-        RenameChatResponse mock = new RenameChatResponse(chatId, request.title(), Instant.now());
-        return ResponseEntity.ok(mock);
+        return ResponseEntity.ok(chatService.renameChat(FIXED_USER_ID, chatId, request));
     }
 
     @Operation(
@@ -115,7 +97,7 @@ public class ChatController {
             @Parameter(description = "ID del chat", required = true)
             @PathVariable Long chatId
     ) {
-        // TODO: implementar con ChatService
+        chatService.deleteChat(FIXED_USER_ID, chatId);
         return ResponseEntity.noContent().build();
     }
 }

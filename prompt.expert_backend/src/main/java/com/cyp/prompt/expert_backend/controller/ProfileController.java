@@ -3,7 +3,7 @@ package com.cyp.prompt.expert_backend.controller;
 import com.cyp.prompt.expert_backend.dto.request.UpdateSkillLevelRequest;
 import com.cyp.prompt.expert_backend.dto.response.ProfileResponse;
 import com.cyp.prompt.expert_backend.dto.response.SkillResponse;
-import com.cyp.prompt.expert_backend.enums.EducationLevel;
+import com.cyp.prompt.expert_backend.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -11,16 +11,20 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Instant;
-import java.util.List;
 
 @Tag(name = "Profile", description = "Gestión del perfil del usuario y sus skills")
 @RestController
 @RequestMapping("/api/profile")
+@RequiredArgsConstructor
 public class ProfileController {
+
+    // Sustituir por SecurityContext cuando se implemente autenticación
+    private static final Long FIXED_USER_ID = 1L;
+
+    private final ProfileService profileService;
 
     @Operation(
             summary = "Obtener perfil del usuario",
@@ -31,21 +35,7 @@ public class ProfileController {
     @ApiResponse(responseCode = "404", description = "Perfil no encontrado")
     @GetMapping
     public ResponseEntity<ProfileResponse> getProfile() {
-        // TODO: implementar con ProfileService
-        ProfileResponse mock = new ProfileResponse(
-                1L,
-                "Lautaro",
-                "lautaro@example.com",
-                EducationLevel.UNIVERSITY_STUDENT,
-                3,
-                true,
-                List.of(
-                        new SkillResponse(3L, "Docker", 2),
-                        new SkillResponse(7L, "Java", 8)
-                ),
-                Instant.parse("2026-01-15T10:00:00Z")
-        );
-        return ResponseEntity.ok(mock);
+        return ResponseEntity.ok(profileService.getProfile(FIXED_USER_ID));
     }
 
     @Operation(
@@ -62,8 +52,6 @@ public class ProfileController {
             @PathVariable Long skillId,
             @Valid @RequestBody UpdateSkillLevelRequest request
     ) {
-        // TODO: implementar con ProfileService
-        SkillResponse mock = new SkillResponse(skillId, "Docker", request.level());
-        return ResponseEntity.ok(mock);
+        return ResponseEntity.ok(profileService.updateSkillLevel(FIXED_USER_ID, skillId, request.level()));
     }
 }
