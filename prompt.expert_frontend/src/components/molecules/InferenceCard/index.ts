@@ -1,0 +1,1 @@
+export { InferenceCard } from './InferenceCard';
