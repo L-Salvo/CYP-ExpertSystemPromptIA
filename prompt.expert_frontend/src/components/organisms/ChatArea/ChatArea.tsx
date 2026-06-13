@@ -1,54 +1,168 @@
-import { useRef, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Send, AlertCircle } from 'lucide-react';
+import { Sparkles, AlertCircle } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MessageBubble } from '../../molecules/MessageBubble';
-import { InferenceCard } from '../../molecules/InferenceCard';
 import { MessageInput } from '../MessageInput';
-import { Spinner } from '../../atoms/Spinner';
 import { Button } from '../../atoms/Button';
 import { useChatStore } from '../../../store/chat.store';
-import { useEnrichPrompt, useSendMessage, useChatDetail } from '../../../hooks/useChat';
+import { useChatDetail, chatDetailKey } from '../../../hooks/useChat';
 import { useCreateChat } from '../../../hooks/useChats';
+import { enrichPrompt, sendMessage } from '../../../api/message.api';
 
 export function ChatArea() {
-  const { activeChatId, pipelineState, pendingMessage, pipelineError, resetPipeline, setActiveChatId } =
-    useChatStore();
+  const {
+    activeChatId,
+    pipelineState,
+    pendingMessage,
+    pipelineError,
+    resetPipeline,
+    setActiveChatId,
+    setPipelineState,
+    setPendingMessage,
+    setPipelineError,
+  } = useChatStore();
+
+  const qc = useQueryClient();
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const [tempAiResponse, setTempAiResponse] = useState<string | null>(null);
+
   const { data: chatDetail } = useChatDetail(activeChatId);
-  const { mutate: enrich } = useEnrichPrompt();
-  const { mutate: send, isPending: sending } = useSendMessage();
   const { mutate: createChat, isPending: creatingChat } = useCreateChat();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const { mutate: enrichAndSend } = useMutation({
+    mutationFn: async ({ chatId, prompt }: { chatId: number; prompt: string }) => {
+      setPipelineState('enriching');
+      setPendingPrompt(prompt);
+      setTempAiResponse(null);
+      
+      // Fase 1: Enriquecer prompt con Prolog
+      const enrichData = await enrichPrompt(chatId, { prompt });
+      setPendingMessage(enrichData);
+
+      // Fase 2: Enviar prompt enriquecido a la IA
+      setPipelineState('sending');
+      const sendData = await sendMessage(enrichData.messageId);
+      return sendData;
+    },
+    onSuccess: (data) => {
+      setTempAiResponse(data.response);
+      setPipelineState('done');
+    },
+    onError: (err: any) => {
+      setPipelineError(err.message ?? 'Error en el procesamiento del mensaje');
+      setPipelineState('error');
+    },
+  });
+
+  const handleVirtualComplete = () => {
+    if (activeChatId) {
+      qc.invalidateQueries({ queryKey: chatDetailKey(activeChatId) }).then(() => {
+        resetPipeline();
+        setPendingPrompt(null);
+        setTempAiResponse(null);
+      });
+    } else {
+      resetPipeline();
+      setPendingPrompt(null);
+      setTempAiResponse(null);
+    }
+  };
 
   const messages = chatDetail?.messages ?? [];
   const hasMessages = messages.length > 0 || pipelineState !== 'idle';
   const noChatSelected = activeChatId === null;
 
-  // Scroll to bottom when messages update
+  // Find if the pending prompt has already been saved as a message in the chat detail
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const isPendingPromptSaved = lastMessage
+    ? lastMessage.originalPrompt === pendingPrompt && lastMessage.aiResponse !== null
+    : false;
+
+  // Virtual message representing the active thought pipeline turn
+  const virtualMsg = (pipelineState !== 'idle' && pendingPrompt && !isPendingPromptSaved) ? {
+    messageId: pendingMessage?.messageId ?? -999,
+    chatId: activeChatId || -1,
+    originalPrompt: pendingPrompt,
+    appliedInferences: pendingMessage?.appliedInferences ?? [],
+    enrichedPrompt: pendingMessage?.enrichedPrompt ?? '',
+    aiResponse: tempAiResponse,
+    createdAt: new Date().toISOString(),
+  } : null;
+
+  const prevChatIdRef = useRef<number | null>(activeChatId);
+  const prevMessagesLength = useRef<number>(messages.length);
+
+  // Scroll to bottom when chat switches or messages update
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, pipelineState]);
+    if (activeChatId !== prevChatIdRef.current) {
+      // Switched chat: scroll to bottom instantly
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      prevChatIdRef.current = activeChatId;
+      prevMessagesLength.current = messages.length;
+    } else if (messages.length > prevMessagesLength.current) {
+      // New message added: scroll smoothly
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      prevMessagesLength.current = messages.length;
+    } else if (pipelineState === 'enriching' || pipelineState === 'sending') {
+      // Virtual message started: scroll smoothly
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length, activeChatId, pipelineState]);
+
+  // Autoscroll as the container grows (e.g. during typewriter typing or thought collapse)
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    // We observe the inner container to detect height changes
+    const innerContainer = scrollContainer.firstElementChild;
+    if (!innerContainer) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Only scroll if we are actively processing a request
+      if (pipelineState !== 'idle') {
+        const threshold = 150; // px
+        const isNearBottom =
+          scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight <= threshold;
+
+        if (isNearBottom) {
+          scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: 'auto',
+          });
+        }
+      }
+    });
+
+    resizeObserver.observe(innerContainer);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [pipelineState]);
 
   function handleSubmit(prompt: string) {
     if (activeChatId) {
-      // Chat ya existe — enriquecer directamente
-      enrich({ chatId: activeChatId, payload: { prompt } });
+      enrichAndSend({ chatId: activeChatId, prompt });
     } else {
-      // No hay chat activo — crear uno primero y luego enriquecer
       createChat(
         { title: prompt.slice(0, 60) },
         {
           onSuccess: (newChat) => {
             setActiveChatId(newChat.chatId);
-            enrich({ chatId: newChat.chatId, payload: { prompt } });
+            enrichAndSend({ chatId: newChat.chatId, prompt });
           },
+          onError: (err: any) => {
+            setPipelineError(err.message ?? 'Error al crear el chat');
+            setPipelineState('error');
+          }
         }
       );
     }
-  }
-
-  function handleSend() {
-    if (!pendingMessage) return;
-    send(pendingMessage.messageId);
   }
 
   const busy = creatingChat || pipelineState === 'enriching' || pipelineState === 'sending';
@@ -56,7 +170,7 @@ export function ChatArea() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* ── Messages / Welcome area ───────────────────────────── */}
-      <div className="flex-1 overflow-y-auto py-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-6">
         <div className="max-w-4xl mx-auto px-4 w-full flex flex-col gap-6">
 
           {/* Welcome state — visible when no chat is selected */}
@@ -107,92 +221,32 @@ export function ChatArea() {
             )}
           </AnimatePresence>
 
-          {/* Persisted messages */}
-          {messages.map((msg) => (
-            <MessageBubble key={msg.messageId} message={msg} />
+          {/* Messages list including active virtual message in a single array to allow React reconciliation */}
+          {[...messages, ...(virtualMsg ? [virtualMsg] : [])].map((msg) => (
+            <MessageBubble
+              key={msg.messageId}
+              message={msg}
+              isVirtual={msg.messageId === virtualMsg?.messageId}
+              onVirtualComplete={msg.messageId === virtualMsg?.messageId ? handleVirtualComplete : undefined}
+            />
           ))}
 
-          {/* Pipeline: Phase 1 — Enriching */}
+          {/* Error notifications */}
           <AnimatePresence>
-            {pipelineState === 'enriching' && (
-              <motion.div
-                key="enriching"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col gap-3"
-              >
-                <div className="flex items-center justify-end">
-                  <div className="bg-white/08 border border-white/10 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[75%]">
-                    <span className="text-sm text-white/40 italic">Analizando...</span>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/08 bg-white/03 px-4 py-4 glow-pulse">
-                  <Spinner label="Sistema Experto pensando... consultando Prolog" />
-                </div>
-              </motion.div>
-            )}
-
-            {/* Pipeline: Phase 1 done — awaiting user confirm for Phase 2 */}
-            {pipelineState === 'awaiting_confirm' && pendingMessage && (
-              <motion.div
-                key="awaiting"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col gap-3"
-              >
-                <InferenceCard enrichData={pendingMessage} autoCollapsed={false} className="glow-purple border-purple-500/30" />
-                <div className="flex items-center gap-3">
-                  <Button
-                    id="send-to-ai-btn"
-                    variant="primary"
-                    size="md"
-                    onClick={handleSend}
-                    loading={sending}
-                    className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-md shadow-purple-500/20 border-0"
-                  >
-                    <Send size={14} />
-                    Enviar a la IA
-                  </Button>
-                  <Button
-                    id="cancel-send-btn"
-                    variant="ghost"
-                    size="md"
-                    onClick={resetPipeline}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Pipeline: Phase 2 — Sending to AI */}
-            {pipelineState === 'sending' && (
-              <motion.div
-                key="sending"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="rounded-2xl border border-white/08 bg-white/03 px-4 py-4 glow-pulse"
-              >
-                <Spinner label="Generando respuesta de IA..." />
-              </motion.div>
-            )}
-
-            {/* Pipeline: Error */}
             {pipelineState === 'error' && pipelineError && (
               <motion.div
                 key="error"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/06 px-4 py-3"
+                className="flex items-start gap-4 py-2"
               >
-                <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="flex flex-col gap-2">
+                <div className="w-8 h-8 rounded-full bg-red-950/30 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle size={14} className="text-red-400" />
+                </div>
+                <div className="flex-1 flex flex-col gap-3 rounded-xl border border-red-500/15 bg-red-500/05 px-4 py-3.5">
                   <p className="text-sm text-red-300">{pipelineError}</p>
-                  <Button variant="danger" size="sm" onClick={resetPipeline}>
+                  <Button variant="danger" size="sm" onClick={resetPipeline} className="self-start">
                     Descartar
                   </Button>
                 </div>

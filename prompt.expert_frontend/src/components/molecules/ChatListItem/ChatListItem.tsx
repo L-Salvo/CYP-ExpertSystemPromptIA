@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import type { ChatResponse } from '../../../types/api.types';
 import { useRenameChat, useDeleteChat } from '../../../hooks/useChats';
@@ -98,24 +99,32 @@ export function ChatListItem({ chat }: ChatListItemProps) {
         </button>
 
         {/* Context menu */}
-        {menuOpen && (
-          <div className="absolute right-0 top-7 z-50 glass rounded-xl overflow-hidden min-w-[160px] shadow-xl">
-            <button
-              onClick={handleRename}
-              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text-primary)] transition-colors"
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="absolute right-0 top-7 z-50 glass rounded-xl overflow-hidden min-w-[160px] shadow-xl"
             >
-              <Pencil size={13} />
-              Renombrar
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
-            >
-              <Trash2 size={13} />
-              Eliminar
-            </button>
-          </div>
-        )}
+              <button
+                onClick={handleRename}
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text-primary)] transition-colors"
+              >
+                <Pencil size={13} />
+                Renombrar
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+              >
+                <Trash2 size={13} />
+                Eliminar
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

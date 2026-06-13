@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { useUIStore } from '../../../store/ui.store';
 import { Sidebar } from '../../organisms/Sidebar';
 import { ProfileDrawer } from '../../organisms/ProfileDrawer';
@@ -16,9 +17,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar />
 
       {/* Main content area — shifts right when sidebar is open */}
-      <main
-        className="flex-1 flex flex-col min-h-0 transition-all duration-300"
-        style={{ marginLeft: isSidebarOpen ? '260px' : '0' }}
+      <motion.main
+        animate={{ marginLeft: isSidebarOpen ? '260px' : '0px' }}
+        transition={{ type: 'spring', stiffness: 280, damping: 32 }}
+        className="flex-1 flex flex-col min-h-0"
       >
         {/* Top bar spacer for toggle button */}
         <div className="h-14 flex-shrink-0" />
@@ -27,7 +29,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex-1 flex flex-col min-h-0">
           {children}
         </div>
-      </main>
+      </motion.main>
 
       {/* Global overlays */}
       <ProfileDrawer />
@@ -35,3 +37,4 @@ export function AppLayout({ children }: AppLayoutProps) {
     </div>
   );
 }
+

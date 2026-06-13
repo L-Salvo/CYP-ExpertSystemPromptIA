@@ -1,5 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import type { ErrorResponse } from '../types/api.types';
+import { mockAdapter } from './mocks';
+
+const useMocks = import.meta.env.VITE_USE_MOCKS === 'true';
 
 const client = axios.create({
   baseURL: '/api',
@@ -8,6 +11,7 @@ const client = axios.create({
     'Accept': 'application/json',
   },
   timeout: 30000,
+  adapter: useMocks ? mockAdapter : undefined,
 });
 
 // Response interceptor — normalizes errors to ErrorResponse shape

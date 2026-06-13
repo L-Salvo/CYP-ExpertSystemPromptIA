@@ -19,24 +19,23 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`rounded-2xl border border-white/08 bg-white/03 overflow-hidden ${className}`}
+      className={`bg-transparent border-0 overflow-hidden ${className}`}
     >
       {/* Header */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/04 transition-colors"
+        className="flex items-center gap-2 text-white/45 hover:text-white/70 transition-colors py-1 text-xs font-medium focus:outline-none cursor-pointer"
         aria-expanded={expanded}
         id={`inference-card-toggle-${enrichData.messageId}`}
       >
-        <div className="flex items-center gap-2.5 text-white/60">
-          <Brain size={14} />
-          <span className="text-xs font-medium">Sistema Experto</span>
-          <span className="text-xs text-white/30">
-            {enrichData.appliedInferences.length} inferencias
-          </span>
-        </div>
-        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown size={14} className="text-white/40" />
+        <Brain size={13} className="text-cyan-500/80" />
+        <span>Proceso de pensamiento (Prolog)</span>
+        <span className="text-white/20">•</span>
+        <span className="text-white/35 font-normal">
+          {enrichData.appliedInferences.length} inferencias
+        </span>
+        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-1">
+          <ChevronDown size={12} className="text-white/30" />
         </motion.div>
       </button>
 
@@ -48,25 +47,27 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/06 pt-3">
+            <div className="pl-4 pb-2 pt-2 flex flex-col gap-3.5 border-l border-white/08 ml-1.5 mt-1">
               {/* Applied inferences */}
-              <div>
-                <p className="text-xs text-white/35 mb-2 uppercase tracking-widest">Inferencias</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {enrichData.appliedInferences.map((inf) => (
-                    <Badge key={inf} variant="inference">{inf}</Badge>
-                  ))}
+              {enrichData.appliedInferences.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Inferencias aplicadas</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {enrichData.appliedInferences.map((inf) => (
+                      <Badge key={inf} variant="inference">{inf}</Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Enriched prompt */}
               <div>
-                <p className="text-xs text-white/35 mb-2 uppercase tracking-widest">Prompt enriquecido</p>
-                <div className="rounded-xl bg-black/40 border border-white/06 p-3">
-                  <p className="text-xs text-white/60 leading-relaxed whitespace-pre-wrap font-mono">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Prompt enriquecido</p>
+                <div className="border-l border-white/10 pl-3 py-1 bg-transparent">
+                  <p className="text-xs text-white/50 leading-relaxed whitespace-pre-wrap font-mono">
                     {enrichData.enrichedPrompt}
                   </p>
                 </div>
