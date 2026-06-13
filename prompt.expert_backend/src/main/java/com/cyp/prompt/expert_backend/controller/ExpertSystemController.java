@@ -2,6 +2,7 @@ package com.cyp.prompt.expert_backend.controller;
 
 import com.cyp.prompt.expert_backend.dto.request.EnrichPromptRequest;
 import com.cyp.prompt.expert_backend.dto.response.EnrichPromptResponse;
+import com.cyp.prompt.expert_backend.service.ExpertSystemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -9,16 +10,20 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Instant;
-import java.util.List;
 
 @Tag(name = "Expert System", description = "Sistema experto de enriquecimiento de prompts mediante SWI-Prolog")
 @RestController
 @RequestMapping("/api/chats")
+@RequiredArgsConstructor
 public class ExpertSystemController {
+
+    // Sustituir por SecurityContext cuando se implemente autenticación
+    private static final Long FIXED_USER_ID = 1L;
+
+    private final ExpertSystemService expertSystemService;
 
     @Operation(
             summary = "Enriquecer prompt",
@@ -41,18 +46,7 @@ public class ExpertSystemController {
             @PathVariable Long chatId,
             @Valid @RequestBody EnrichPromptRequest request
     ) {
-        // TODO: implementar con ExpertSystemService (consulta perfil → invoca Prolog → construye prompt enriquecido)
-        EnrichPromptResponse mock = new EnrichPromptResponse(
-                15L,
-                chatId,
-                request.prompt(),
-                List.of("backend_developer", "needs_docker", "use_java_examples"),
-                "El usuario es estudiante universitario de tercer año que trabaja en IT y tiene nivel avanzado en Java (8/10) "
-                        + "pero nivel inicial en Docker (2/10). " + request.prompt()
-                        + " desde una perspectiva de backend Java.",
-                null,
-                Instant.now()
-        );
-        return ResponseEntity.status(201).body(mock);
+        EnrichPromptResponse response = expertSystemService.enrichPrompt(FIXED_USER_ID, chatId, request);
+        return ResponseEntity.status(201).body(response);
     }
 }

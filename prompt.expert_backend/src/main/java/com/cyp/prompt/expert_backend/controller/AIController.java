@@ -1,19 +1,27 @@
 package com.cyp.prompt.expert_backend.controller;
 
 import com.cyp.prompt.expert_backend.dto.response.SendMessageResponse;
+import com.cyp.prompt.expert_backend.service.AIService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "AI", description = "Envío de prompts enriquecidos al modelo de IA externo")
 @RestController
 @RequestMapping("/api/messages")
+@RequiredArgsConstructor
 public class AIController {
+
+    // Sustituir por SecurityContext cuando se implemente autenticación
+    private static final Long FIXED_USER_ID = 1L;
+
+    private final AIService aiService;
 
     @Operation(
             summary = "Enviar prompt enriquecido a la IA",
@@ -34,13 +42,8 @@ public class AIController {
             @Parameter(description = "ID del mensaje a enviar", required = true)
             @PathVariable Long messageId
     ) {
-        // TODO: implementar con AIService (recupera enrichedPrompt → llama IA → persiste aiResponse)
-        SendMessageResponse mock = new SendMessageResponse(
-                messageId,
-                "Docker es una plataforma de contenedores que permite empaquetar aplicaciones junto con sus dependencias "
-                        + "en unidades aisladas llamadas contenedores. [Mock response]"
-        );
-        return ResponseEntity.ok(mock);
+        SendMessageResponse response = aiService.sendMessage(FIXED_USER_ID, messageId);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(
@@ -59,11 +62,7 @@ public class AIController {
             @Parameter(description = "ID del mensaje a reintentar", required = true)
             @PathVariable Long messageId
     ) {
-        // TODO: implementar con AIService (mismo flujo que /send, pero sobrescribe aiResponse existente)
-        SendMessageResponse mock = new SendMessageResponse(
-                messageId,
-                "Docker es una plataforma de contenedores... [Mock retry response]"
-        );
-        return ResponseEntity.ok(mock);
+        SendMessageResponse response = aiService.retryMessage(FIXED_USER_ID, messageId);
+        return ResponseEntity.ok(response);
     }
 }
