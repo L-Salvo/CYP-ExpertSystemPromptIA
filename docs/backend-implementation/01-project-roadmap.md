@@ -142,7 +142,7 @@ graph TD
 | `ExpertSystemService`, `PromptBuilder`, `PrologClient` | ⏳ Pendiente | PASOS 9–11 |
 | `AIService`, `AIClient` | ⏳ Pendiente | PASOS 12–13 |
 | `data.sql` seed | ⏳ Pendiente | PASO 15. Debe usar nombres del enum en mayúsculas (`'BACKEND'`, etc.) |
-| Actuator | ⏳ Pendiente | PASO 16 |
+| Actuator | ✅ Implementado | PASO 16. Expone **únicamente** `/actuator/health` (`show-details=never`) e `/actuator/info` |
 | Tests (unit / controller / repository) | ⏳ Pendiente | PASOS 17–19 |
 | Docker Compose | ⏳ Pendiente | PASO 20 |
 

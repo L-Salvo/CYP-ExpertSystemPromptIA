@@ -617,15 +617,23 @@ ON CONFLICT (user_id, skill_id) DO NOTHING;
 pom.xml → agregar spring-boot-starter-actuator
 
 application.properties → agregar:
-  management.endpoints.web.exposure.include=health
+  management.endpoints.web.exposure.include=health,info
   management.endpoint.health.show-details=never
+  management.info.env.enabled=true
+  info.app.name / info.app.description / info.app.version
 ```
+
+> **Decisión arquitectónica:** se exponen **únicamente** `/actuator/health` y
+> `/actuator/info`. Ningún otro endpoint Actuator queda accesible.
+> `health.show-details=never` evita filtrar detalles internos (BD, disco, etc.).
 
 ### Criterio de aceptación
 
 ```
-GET /actuator/health → { "status": "UP" }
-→ Necesario para healthchecks en Docker Compose
+GET /actuator/health → { "status": "UP" }   (sin detalles)
+GET /actuator/info    → metadatos de la app (info.app.*)
+GET /actuator/<otro>  → 404 (no expuesto)
+→ /actuator/health es necesario para healthchecks en Docker Compose
 ```
 
 ---

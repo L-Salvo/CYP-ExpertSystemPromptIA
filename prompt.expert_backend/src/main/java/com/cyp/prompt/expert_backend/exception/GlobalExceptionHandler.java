@@ -9,6 +9,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.cyp.prompt.expert_backend.dto.response.ErrorResponse;
 
@@ -50,6 +52,11 @@ public class GlobalExceptionHandler {
                 .map(GlobalExceptionHandler::formatFieldError)
                 .collect(Collectors.joining("; "));
         return build(HttpStatus.BAD_REQUEST, message.isEmpty() ? "Validation failed" : message);
+    }
+
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNotFound(Exception ex) {
+        return build(HttpStatus.NOT_FOUND, "Recurso no encontrado");
     }
 
     @ExceptionHandler(Exception.class)
