@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Brain } from 'lucide-react';
 import { Badge } from '../../atoms/Badge';
 import type { EnrichPromptResponse } from '../../../types/api.types';
@@ -15,12 +14,7 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
   const [expanded, setExpanded] = useState(!autoCollapsed);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`bg-transparent border-0 overflow-hidden ${className}`}
-    >
+    <div className={`bg-transparent border-0 overflow-hidden ${className}`}>
       {/* Header */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -34,48 +28,46 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
         <span className="text-white/35 font-normal">
           {enrichData.appliedInferences.length} inferencias
         </span>
-        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-1">
-          <ChevronDown size={12} className="text-white/30" />
-        </motion.div>
+        <ChevronDown
+          size={12}
+          className={`text-white/30 ml-1 transition-transform duration-200 ${
+            expanded ? 'rotate-180' : ''
+          }`}
+        />
       </button>
 
-      {/* Body */}
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            key="body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="pl-4 pb-2 pt-2 flex flex-col gap-3.5 border-l border-white/08 ml-1.5 mt-1">
-              {/* Applied inferences */}
-              {enrichData.appliedInferences.length > 0 && (
-                <div>
-                  <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Inferencias aplicadas</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {enrichData.appliedInferences.map((inf) => (
-                      <Badge key={inf} variant="inference">{inf}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Enriched prompt */}
+      {/* Body — Smooth CSS Grid Height Transition */}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out ${
+          expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="pl-4 pb-2 pt-2 flex flex-col gap-3.5 border-l border-white/08 ml-1.5 mt-1">
+            {/* Applied inferences */}
+            {enrichData.appliedInferences.length > 0 && (
               <div>
-                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Prompt enriquecido</p>
-                <div className="border-l border-white/10 pl-3 py-1 bg-transparent">
-                  <p className="text-xs text-white/50 leading-relaxed whitespace-pre-wrap font-mono">
-                    {enrichData.enrichedPrompt}
-                  </p>
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Inferencias aplicadas</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {enrichData.appliedInferences.map((inf) => (
+                    <Badge key={inf} variant="inference">{inf}</Badge>
+                  ))}
                 </div>
               </div>
+            )}
+
+            {/* Enriched prompt */}
+            <div>
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Prompt enriquecido</p>
+              <div className="border-l border-white/10 pl-3 py-1 bg-transparent">
+                <p className="text-xs text-white/50 leading-relaxed whitespace-pre-wrap font-mono">
+                  {enrichData.enrichedPrompt}
+                </p>
+              </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

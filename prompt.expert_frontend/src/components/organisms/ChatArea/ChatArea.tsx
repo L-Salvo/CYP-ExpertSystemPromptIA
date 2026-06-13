@@ -76,14 +76,20 @@ export function ChatArea() {
   const hasMessages = messages.length > 0 || pipelineState !== 'idle';
   const noChatSelected = activeChatId === null;
 
-  // Find if the pending prompt has already been saved as a message in the chat detail
+  // Find if the pending message has already been saved as a message in the chat detail
+  const isPendingMessageSaved = pendingMessage
+    ? messages.some((m) => m.messageId === pendingMessage.messageId)
+    : false;
+
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const isPendingPromptSaved = lastMessage
     ? lastMessage.originalPrompt === pendingPrompt && lastMessage.aiResponse !== null
     : false;
 
+  const isAlreadySaved = isPendingMessageSaved || isPendingPromptSaved;
+
   // Virtual message representing the active thought pipeline turn
-  const virtualMsg = (pipelineState !== 'idle' && pendingPrompt && !isPendingPromptSaved) ? {
+  const virtualMsg = (pipelineState !== 'idle' && pendingPrompt && !isAlreadySaved) ? {
     messageId: pendingMessage?.messageId ?? -999,
     chatId: activeChatId || -1,
     originalPrompt: pendingPrompt,
@@ -94,47 +100,47 @@ export function ChatArea() {
   } : null;
 
   const prevChatIdRef = useRef<number | null>(activeChatId);
-  const prevMessagesLength = useRef<number>(messages.length);
 
-  // Scroll to bottom when chat switches or messages update
+  // Scroll to bottom when chat switches
   useEffect(() => {
     if (activeChatId !== prevChatIdRef.current) {
       // Switched chat: scroll to bottom instantly
       bottomRef.current?.scrollIntoView({ behavior: 'auto' });
       prevChatIdRef.current = activeChatId;
-      prevMessagesLength.current = messages.length;
-    } else if (messages.length > prevMessagesLength.current) {
-      // New message added: scroll smoothly
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-      prevMessagesLength.current = messages.length;
-    } else if (pipelineState === 'enriching' || pipelineState === 'sending') {
-      // Virtual message started: scroll smoothly
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages.length, activeChatId, pipelineState]);
+  }, [activeChatId]);
 
-  // Autoscroll as the container grows (e.g. during typewriter typing or thought collapse)
+  // Force scroll to bottom when a question starts processing (pipeline state active)
+  useEffect(() => {
+    if (pipelineState !== 'idle') {
+      const scrollContainer = scrollContainerRef.current;
+      if (scrollContainer) {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: 'auto',
+        });
+      }
+    }
+  }, [pipelineState]);
+
+  // Autoscroll as the container grows (e.g. during typewriter typing or message additions)
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
 
-    // We observe the inner container to detect height changes
     const innerContainer = scrollContainer.firstElementChild;
     if (!innerContainer) return;
 
     const resizeObserver = new ResizeObserver(() => {
-      // Only scroll if we are actively processing a request
-      if (pipelineState !== 'idle') {
-        const threshold = 150; // px
-        const isNearBottom =
-          scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight <= threshold;
+      const threshold = 150; // px
+      const isNearBottom =
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight <= threshold;
 
-        if (isNearBottom) {
-          scrollContainer.scrollTo({
-            top: scrollContainer.scrollHeight,
-            behavior: 'auto',
-          });
-        }
+      if (isNearBottom) {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: 'auto',
+        });
       }
     });
 
@@ -143,9 +149,18 @@ export function ChatArea() {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [pipelineState]);
+  }, []);
 
   function handleSubmit(prompt: string) {
+    // Scroll to bottom instantly on submit to ensure viewport is positioned at the end
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer) {
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior: 'auto',
+      });
+    }
+
     if (activeChatId) {
       enrichAndSend({ chatId: activeChatId, prompt });
     } else {
@@ -170,7 +185,7 @@ export function ChatArea() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* ── Messages / Welcome area ───────────────────────────── */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden py-6">
         <div className="max-w-4xl mx-auto px-4 w-full flex flex-col gap-6">
 
           {/* Welcome state — visible when no chat is selected */}
