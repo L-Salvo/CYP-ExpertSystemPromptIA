@@ -255,4 +255,39 @@ CYP-ExpertSystemPromptIA/
 
 ---
 
+## Estado actual de la implementación (PASO 20 — base)
+
+El diseño anterior describe el objetivo final (4 servicios). **Lo implementado hasta ahora** es la base con dos servicios:
+
+| Servicio | Estado | Notas |
+|---|---|---|
+| `postgres` | ✅ implementado | `postgres:16-alpine`, volumen `postgres-data`, puerto `5432`, healthcheck `pg_isready` |
+| `backend` | ✅ implementado | build multi-stage (`prompt.expert_backend/Dockerfile`), perfil `docker`, healthcheck `/actuator/health` |
+| `prolog` | ⏳ siguiente paso | bloque ya preparado y comentado en `docker-compose.yml` |
+| `frontend` | ⏳ pendiente | fuera del alcance de este paso |
+
+**Diferencias con el perfil `prod`** (deliberadas, para que la base sea autocontenida):
+
+- Perfil activo: `docker` (`application-docker.properties`), no `prod`.
+- `ddl-auto=update` en vez de `validate`: Hibernate crea las tablas y el volumen las persiste (no hay migraciones aún).
+- `prolog.mock` / `ai.mock` por defecto `true` (vía `PROLOG_MOCK` / `AI_MOCK`): el backend levanta sin depender de Prolog ni de un proveedor de IA.
+
+**Archivos creados:** `docker-compose.yml`, `.env.example`, `.gitignore` (ignora `.env`), `prompt.expert_backend/Dockerfile`, `prompt.expert_backend/.dockerignore`, `prompt.expert_backend/src/main/resources/application-docker.properties`.
+
+**Comandos:**
+
+```bash
+cp .env.example .env      # completar POSTGRES_PASSWORD
+docker compose up --build # postgres + backend
+docker compose down       # parar (-v borra el volumen de datos)
+```
+
+**Cómo agregar Prolog (siguiente paso):**
+
+1. Crear `prompt.expert_prolog/` con `Dockerfile` + `server.pl` (servidor HTTP SWI-Prolog con `GET /health` y `POST /infer`).
+2. Descomentar el servicio `prolog` en `docker-compose.yml` y la dependencia `prolog: condition: service_healthy` del backend.
+3. Poner `PROLOG_MOCK=false` en `.env`. El backend pasa a usar `PrologRestClient` contra `http://prolog:8081` — sin cambios de código (el switch ya existe en `PrologClientConfig`).
+
+---
+
 *Siguiente documento: `10-testing-strategy.md`*
