@@ -1,14 +1,14 @@
 # =============================================================
-# Docker Compose — PASO 20 (base)
+# Docker Compose — Backend + PostgreSQL + Prolog real
 # -------------------------------------------------------------
-# Alcance actual: PostgreSQL + Backend Spring Boot.
+# Servicios:
+#   postgres  — base de datos
+#   prolog    — motor de inferencias SWI-Prolog (servicio real)
+#   backend   — Spring Boot; usa PrologRestClient contra `prolog`
 #
 # NO incluye todavía:
 #   - frontend
-#   - servicio Prolog real
-#
-# La estructura queda preparada para agregar `prolog` en el
-# siguiente paso (ver bloque comentado al final).
+#   - proveedor real de IA (AI sigue en mock)
 # =============================================================
 
 services:
@@ -37,6 +37,26 @@ services:
       - app-network
 
   # ---------------------------------------------------------
+  # Prolog — motor de inferencias real (SWI-Prolog HTTP)
+  # ---------------------------------------------------------
+  prolog:
+    build:
+      context: ./prompt.expert_prolog
+    container_name: cyp-prolog
+    environment:
+      PROLOG_PORT: 8081
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-network
+
+  # ---------------------------------------------------------
   # Backend Spring Boot
   # ---------------------------------------------------------
   backend:
@@ -46,8 +66,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      prolog:
+        condition: service_healthy
     environment:
-      # Perfil dockerizado (Prolog/IA en mock en esta base).
+      # Perfil dockerizado.
       SPRING_PROFILES_ACTIVE: docker
 
       # Conexión a postgres por nombre de servicio (NO localhost).
@@ -55,12 +77,12 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
 
-      # Prolog: en mock por ahora. El próximo paso lo pondrá en false
-      # y apuntará a http://prolog:8081 sin tocar código.
-      PROLOG_MOCK: ${PROLOG_MOCK:-true}
+      # Prolog real: PrologRestClient contra el servicio `prolog`.
+      # PROLOG_MOCK=false activa PrologRestClient (sin tocar código Java).
+      PROLOG_MOCK: ${PROLOG_MOCK:-false}
       PROLOG_SERVICE_BASE_URL: ${PROLOG_SERVICE_BASE_URL:-http://prolog:8081}
 
-      # IA: en mock (fuera del alcance de este paso).
+      # IA: sigue en mock (fuera del alcance de esta fase).
       AI_MOCK: ${AI_MOCK:-true}
     ports:
       - "8080:8080"
@@ -72,35 +94,6 @@ services:
       start_period: 40s
     networks:
       - app-network
-
-  # ---------------------------------------------------------
-  # SIGUIENTE PASO — servicio Prolog (NO habilitado todavía)
-  # ---------------------------------------------------------
-  # prolog:
-  #   build:
-  #     context: ./prompt.expert_prolog   # directorio a crear (Dockerfile + server.pl)
-  #   container_name: cyp-prolog
-  #   environment:
-  #     PROLOG_PORT: 8081
-  #   ports:
-  #     - "8081:8081"
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-  #     interval: 15s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 10s
-  #   networks:
-  #     - app-network
-  #
-  # Y en `backend` añadir la dependencia + activar Prolog real:
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     prolog:
-  #       condition: service_healthy
-  #   environment:
-  #     PROLOG_MOCK: "false"   (o en .env)
 
 networks:
   app-network:
