@@ -15,8 +15,14 @@
        education_level/1, % accesores (exportados para rules.pl)
        study_year/1,
        works_in_it/1,
-       skill/2
+       skill/2,
+       % --- prompt-aware (F1/F2/F3) ---
+       prompt_tokens/1,
+       topic/1,
+       intent/1
    ]).
+
+:- use_module(nlp).
 
 % Hechos temporales del perfil del usuario (uno por request/hilo).
 :- thread_local education_level/1.   % education_level(Atom)
@@ -24,15 +30,36 @@
 :- thread_local works_in_it/1.       % works_in_it(true|false)
 :- thread_local skill/2.             % skill(NormName, Level)
 
+% Hechos temporales derivados del prompt (F1/F2/F3).
+:- thread_local prompt_tokens/1.     % prompt_tokens(ListaDeTokens)
+:- thread_local topic/1.             % topic(Atom)   (topic(unknown) si ninguno)
+:- thread_local intent/1.            % intent(Atom)  (intent(explain) por defecto)
+
 % ---- Carga ----
-% Extrae userProfile y asienta los hechos. Tolerante a campos
+% Extrae userProfile + prompt y asienta los hechos. Tolerante a campos
 % ausentes para que el servidor nunca falle por un payload parcial.
 load_facts(Dict) :-
     ( get_dict(userProfile, Dict, Profile) -> true ; Profile = _{} ),
     load_education(Profile),
     load_study_year(Profile),
     load_works_in_it(Profile),
-    load_skills(Profile).
+    load_skills(Profile),
+    load_prompt_facts(Dict).
+
+% ---- F1: plumbing del prompt + F2/F3: tema e intención ----
+load_prompt_facts(Dict) :-
+    ( get_dict(prompt, Dict, P), string(P) -> Prompt = P ; Prompt = "" ),
+    normalize_text(Prompt, Norm),
+    tokenize(Norm, Tokens),
+    assertz(prompt_tokens(Tokens)),
+    % F2 — temas; si no hay ninguno → topic(unknown)
+    detect_topics(Tokens, Topics0),
+    ( Topics0 == [] -> Topics = [unknown] ; Topics = Topics0 ),
+    forall(member(T, Topics), assertz(topic(T))),
+    % F3 — intenciones; si no hay ninguna → intent(explain)
+    detect_intents(Tokens, Intents0),
+    ( Intents0 == [] -> Intents = [explain] ; Intents = Intents0 ),
+    forall(member(I, Intents), assertz(intent(I))).
 
 load_education(Profile) :-
     (   get_dict(educationLevel, Profile, E0), E0 \== null
@@ -85,4 +112,8 @@ clear_facts :-
     retractall(education_level(_)),
     retractall(study_year(_)),
     retractall(works_in_it(_)),
-    retractall(skill(_, _)).
+    retractall(skill(_, _)),
+    % --- prompt-aware (F1/F2/F3) ---
+    retractall(prompt_tokens(_)),
+    retractall(topic(_)),
+    retractall(intent(_)).

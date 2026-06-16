@@ -1,7 +1,9 @@
 package com.cyp.prompt.expert_backend.service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,9 @@ public class ExpertSystemService {
     private final PrologClient prologClient;
     private final PromptBuilder promptBuilder;
 
+    // ===== DIAGNÓSTICO TEMPORAL (remover tras depurar) =====
+    private static final ObjectMapper DIAG_MAPPER = new ObjectMapper();
+
     /**
      * Enriquece el prompt original del usuario y persiste el mensaje resultante.
      *
@@ -78,6 +83,18 @@ public class ExpertSystemService {
 
         // 3. PrologRequest con datos reales (sin mocks de perfil).
         PrologRequest prologRequest = buildPrologRequest(request.prompt(), user, userSkills);
+
+        // ===== DIAGNÓSTICO TEMPORAL (remover tras depurar) =====
+        try {
+            byte[] promptBytes = request.prompt().getBytes(StandardCharsets.UTF_8);
+            log.warn("[DIAG] enrichPrompt → userId={}, chatId={}, prompt='{}', chars={}, utf8Bytes={}",
+                    userId, chatId, request.prompt(), request.prompt().length(), promptBytes.length);
+            log.warn("[DIAG] prompt (hex UTF-8) = {}", toHex(promptBytes));
+            log.warn("[DIAG] PrologRequest serializado = {}", DIAG_MAPPER.writeValueAsString(prologRequest));
+        } catch (Exception diagEx) {
+            log.warn("[DIAG] Error en logging de diagnóstico: {}", diagEx.toString());
+        }
+        // ===== FIN DIAGNÓSTICO =====
 
         // 4. Inferencia: inferences + recommendations + additionalContext.
         PrologResponse prologResponse = prologClient.infer(prologRequest);
@@ -127,5 +144,14 @@ public class ExpertSystemService {
         );
 
         return new PrologRequest(prompt, profile);
+    }
+
+    // ===== DIAGNÓSTICO TEMPORAL =====
+    private static String toHex(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : data) {
+            sb.append(String.format("%02x ", b));
+        }
+        return sb.toString().trim();
     }
 }

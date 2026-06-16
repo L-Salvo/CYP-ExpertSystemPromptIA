@@ -12,8 +12,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# server.pl (HTTP) + rules.pl y facts.pl (base de conocimiento).
-COPY server.pl rules.pl facts.pl ./
+# server.pl (HTTP) + rules.pl, facts.pl, nlp.pl (base de conocimiento).
+COPY server.pl rules.pl facts.pl nlp.pl ./
 
 # Puerto del servidor HTTP de Prolog (alineado con docker-compose).
 ENV PROLOG_PORT=8081

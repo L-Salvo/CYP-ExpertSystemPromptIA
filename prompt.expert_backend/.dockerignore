@@ -1,0 +1,11 @@
+# Artefactos de build locales (se generan dentro de la imagen)
+target/
+*.iml
+.idea/
+
+# Logs y temporales
+*.log
+
+# Git
+.git/
+.gitignore
