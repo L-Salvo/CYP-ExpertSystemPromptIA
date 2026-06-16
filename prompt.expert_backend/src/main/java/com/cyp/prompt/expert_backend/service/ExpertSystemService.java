@@ -21,7 +21,6 @@ import com.cyp.prompt.expert_backend.entity.UserSkill;
 import com.cyp.prompt.expert_backend.exception.ResourceNotFoundException;
 import com.cyp.prompt.expert_backend.repository.ChatRepository;
 import com.cyp.prompt.expert_backend.repository.MessageRepository;
-import com.cyp.prompt.expert_backend.repository.UserRepository;
 import com.cyp.prompt.expert_backend.repository.UserSkillRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -51,7 +50,6 @@ public class ExpertSystemService {
 
     private final ChatRepository chatRepository;
     private final MessageRepository messageRepository;
-    private final UserRepository userRepository;
     private final UserSkillRepository userSkillRepository;
     private final PrologClient prologClient;
     private final PromptBuilder promptBuilder;
@@ -62,24 +60,26 @@ public class ExpertSystemService {
     /**
      * Enriquece el prompt original del usuario y persiste el mensaje resultante.
      *
-     * @param userId  dueño del chat (ownership verificado contra {@code chatId})
+     * <p>El usuario es el <b>dueño del chat</b> ({@code chat.getUser()}): no se pasa
+     * ningún {@code userId} externo ni constante hardcodeada. Así el sistema experto
+     * siempre usa el perfil real del propietario del chat.</p>
+     *
      * @param chatId  chat al que pertenecerá el mensaje
      * @param request prompt original del usuario
      * @return los datos del mensaje persistido, con {@code aiResponse = null}
-     * @throws ResourceNotFoundException si el chat no existe o no pertenece al usuario
+     * @throws ResourceNotFoundException si el chat no existe
      * @throws com.cyp.prompt.expert_backend.exception.ExternalServiceException
      *         si el servicio Prolog no está disponible
      */
     @Transactional
-    public EnrichPromptResponse enrichPrompt(Long userId, Long chatId, EnrichPromptRequest request) {
-        // 1. Ownership: el chat debe existir y pertenecer al usuario.
-        Chat chat = chatRepository.findByIdAndUserId(chatId, userId)
+    public EnrichPromptResponse enrichPrompt(Long chatId, EnrichPromptRequest request) {
+        // 1. Recupera el chat; su propietario define el perfil a usar.
+        Chat chat = chatRepository.findById(chatId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat not found with id: " + chatId));
 
-        // 2. Perfil real del usuario desde PostgreSQL.
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-        List<UserSkill> userSkills = userSkillRepository.findByUserId(userId);
+        // 2. Perfil REAL del dueño del chat desde PostgreSQL.
+        User user = chat.getUser();
+        List<UserSkill> userSkills = userSkillRepository.findByUserId(user.getId());
 
         // 3. PrologRequest con datos reales (sin mocks de perfil).
         PrologRequest prologRequest = buildPrologRequest(request.prompt(), user, userSkills);
@@ -88,7 +88,7 @@ public class ExpertSystemService {
         try {
             byte[] promptBytes = request.prompt().getBytes(StandardCharsets.UTF_8);
             log.warn("[DIAG] enrichPrompt → userId={}, chatId={}, prompt='{}', chars={}, utf8Bytes={}",
-                    userId, chatId, request.prompt(), request.prompt().length(), promptBytes.length);
+                    user.getId(), chatId, request.prompt(), request.prompt().length(), promptBytes.length);
             log.warn("[DIAG] prompt (hex UTF-8) = {}", toHex(promptBytes));
             log.warn("[DIAG] PrologRequest serializado = {}", DIAG_MAPPER.writeValueAsString(prologRequest));
         } catch (Exception diagEx) {

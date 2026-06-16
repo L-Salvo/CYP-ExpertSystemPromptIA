@@ -1,0 +1,19 @@
+# Dependencias y artefactos (se reinstalan/recompilan en la imagen).
+node_modules
+dist
+dist-ssr
+
+# Variables de entorno locales: la imagen usa el ARG VITE_USE_MOCKS (false).
+.env
+.env.*
+*.local
+
+# Ruido que no aporta al build.
+.git
+.idea
+.vscode
+*.log
+npm-debug.log*
+README.md
+Dockerfile
+.dockerignore

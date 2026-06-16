@@ -14,6 +14,15 @@ const client = axios.create({
   adapter: useMocks ? mockAdapter : undefined,
 });
 
+// Auth demo (sin tokens): el backend identifica al usuario por el header X-User-Id.
+// Se toma el userId guardado en localStorage tras el login; por defecto '1'
+// (usuario seed) para que la app funcione antes de iniciar sesión.
+client.interceptors.request.use((config) => {
+  const userId = localStorage.getItem('userId') ?? '1';
+  config.headers.set('X-User-Id', userId);
+  return config;
+});
+
 // Response interceptor — normalizes errors to ErrorResponse shape
 client.interceptors.response.use(
   (response) => response,

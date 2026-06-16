@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -33,6 +35,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex) {
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    // Header de identidad demo (X-User-Id) ausente o con tipo inválido → 400.
+    @ExceptionHandler({MissingRequestHeaderException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ErrorResponse> handleBadRequestHeader(Exception ex) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(ExternalServiceException.class)

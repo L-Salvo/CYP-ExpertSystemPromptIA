@@ -26,8 +26,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatController {
 
-    // Sustituir por SecurityContext cuando se implemente autenticación
-    private static final Long FIXED_USER_ID = 1L;
+    // Identidad del usuario (demo, sin Spring Security): llega en el header X-User-Id.
+    // El frontend lo almacena tras el login y lo reenvía en cada request.
+    private static final String USER_ID_HEADER = "X-User-Id";
 
     private final ChatService chatService;
 
@@ -39,8 +40,10 @@ public class ChatController {
             content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     @ApiResponse(responseCode = "400", description = "Request inválido")
     @PostMapping
-    public ResponseEntity<ChatResponse> createChat(@Valid @RequestBody CreateChatRequest request) {
-        return ResponseEntity.status(201).body(chatService.createChat(FIXED_USER_ID, request));
+    public ResponseEntity<ChatResponse> createChat(
+            @RequestHeader(USER_ID_HEADER) Long userId,
+            @Valid @RequestBody CreateChatRequest request) {
+        return ResponseEntity.status(201).body(chatService.createChat(userId, request));
     }
 
     @Operation(
@@ -50,8 +53,9 @@ public class ChatController {
     @ApiResponse(responseCode = "200", description = "Lista obtenida correctamente",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = ChatResponse.class))))
     @GetMapping
-    public ResponseEntity<List<ChatResponse>> getChats() {
-        return ResponseEntity.ok(chatService.getChats(FIXED_USER_ID));
+    public ResponseEntity<List<ChatResponse>> getChats(
+            @RequestHeader(USER_ID_HEADER) Long userId) {
+        return ResponseEntity.ok(chatService.getChats(userId));
     }
 
     @Operation(
@@ -63,10 +67,11 @@ public class ChatController {
     @ApiResponse(responseCode = "404", description = "Chat no encontrado")
     @GetMapping("/{chatId}")
     public ResponseEntity<ChatDetailResponse> getChatById(
+            @RequestHeader(USER_ID_HEADER) Long userId,
             @Parameter(description = "ID del chat", required = true)
             @PathVariable Long chatId
     ) {
-        return ResponseEntity.ok(chatService.getChatById(FIXED_USER_ID, chatId));
+        return ResponseEntity.ok(chatService.getChatById(userId, chatId));
     }
 
     @Operation(
@@ -79,11 +84,12 @@ public class ChatController {
     @ApiResponse(responseCode = "404", description = "Chat no encontrado")
     @PatchMapping("/{chatId}")
     public ResponseEntity<RenameChatResponse> renameChat(
+            @RequestHeader(USER_ID_HEADER) Long userId,
             @Parameter(description = "ID del chat", required = true)
             @PathVariable Long chatId,
             @Valid @RequestBody RenameChatRequest request
     ) {
-        return ResponseEntity.ok(chatService.renameChat(FIXED_USER_ID, chatId, request));
+        return ResponseEntity.ok(chatService.renameChat(userId, chatId, request));
     }
 
     @Operation(
@@ -94,10 +100,11 @@ public class ChatController {
     @ApiResponse(responseCode = "404", description = "Chat no encontrado")
     @DeleteMapping("/{chatId}")
     public ResponseEntity<Void> deleteChat(
+            @RequestHeader(USER_ID_HEADER) Long userId,
             @Parameter(description = "ID del chat", required = true)
             @PathVariable Long chatId
     ) {
-        chatService.deleteChat(FIXED_USER_ID, chatId);
+        chatService.deleteChat(userId, chatId);
         return ResponseEntity.noContent().build();
     }
 }

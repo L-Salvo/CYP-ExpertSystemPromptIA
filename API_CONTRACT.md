@@ -12,6 +12,7 @@
 1. [Introducción](#1-introducción)
 2. [Convenciones](#2-convenciones)
 3. [ProfileController](#3-profilecontroller)
+3.bis. [UserController — Registro, Login y Onboarding](#3bis-usercontroller--registro-login-y-onboarding)
 4. [ChatController](#4-chatcontroller)
 5. [ExpertSystemController](#5-expertsystemcontroller)
 6. [AIController](#6-aicontroller)
@@ -41,8 +42,18 @@ El sistema permite gestionar perfiles de usuario, enriquecer prompts mediante in
 | **Formato** | JSON (`application/json`) |
 | **Encoding** | UTF-8 |
 | **Fechas** | ISO-8601 — `2026-06-10T14:30:00Z` |
-| **Autenticación** | A definir (fuera del alcance v1) |
+| **Autenticación** | **Demo (sin tokens):** header `X-User-Id` identifica al usuario (ver abajo) |
 | **Identificadores** | Enteros (`Long`) en todos los IDs |
+
+### Autenticación demo (`X-User-Id`)
+
+> ⚠️ **Solo para la demo académica.** No hay Spring Security, JWT, sesiones ni cookies. Las passwords se guardan en **texto plano**. **No usar en producción.**
+
+El usuario se registra (`POST /api/users/register`) e inicia sesión (`POST /api/users/login`). El login **no** devuelve token: el frontend almacena el `userId` y lo reenvía en el header **`X-User-Id`** en cada request a endpoints con dueño.
+
+- Endpoints que requieren `X-User-Id` (actor): `ProfileController` (`/api/profile**`), `ChatController` (`/api/chats` crear/listar/obtener/renombrar/eliminar) y `AIController` (`/api/messages/**`). Si falta el header → `400 Bad Request`.
+- **Excepción — `POST /api/chats/{chatId}/messages/enrich`:** **no** usa `X-User-Id`. El usuario se deriva del **dueño del chat** (`chat.user`), de modo que el sistema experto siempre usa el perfil real del propietario.
+- Endpoints públicos (sin header): `POST /api/users/register`, `POST /api/users/login`, `POST /api/users`, `GET /api/users/{id}`, `PUT /api/users/{id}/onboarding`, `GET /api/skills`.
 
 ### Estructura de errores
 
@@ -199,7 +210,245 @@ Obtener el catálogo completo de skills disponibles en el sistema.
 
 ---
 
+## 3.bis UserController — Registro, Login y Onboarding
+
+Gestión de alta de usuarios, **autenticación demo** (registro + login) y completado de perfil (onboarding). El login devuelve el `userId`; el frontend lo almacena y lo reenvía en el header `X-User-Id` (ver [Autenticación demo](#autenticación-demo-x-user-id)).
+
+> **Estado del perfil — `onboardingComplete`:** es un valor **calculado, no persistido**. Es `true` cuando el usuario tiene presentes `educationLevel`, `studyYear`, `worksInIT` **y** al menos una skill asociada; `false` en caso contrario.
+
+> ⚠️ **Seguridad (demo):** las passwords se almacenan en **texto plano** (sin hashing). No hay tokens ni sesiones. Simplificación deliberada para la demo académica.
+
+### `POST /api/users/register`
+
+Registra un usuario con credenciales. El perfil queda vacío hasta el onboarding.
+
+| Campo | Valor |
+|---|---|
+| **Método** | `POST` |
+| **URL** | `/api/users/register` |
+| **Request body** | `RegisterUserRequest` |
+
+**Request body**
+
+```json
+{
+  "name": "Pedro",
+  "email": "pedro@test.com",
+  "password": "1234"
+}
+```
+
+> `name`, `email` y `password` obligatorios. `email` con formato válido y **único**.
+
+**Response body** `201 Created`
+
+```json
+{
+  "userId": 5,
+  "onboardingComplete": false
+}
+```
+
+**Códigos HTTP**
+
+| Código | Descripción |
+|---|---|
+| `201` | Usuario registrado |
+| `400` | `name`/`email`/`password` ausentes o `email` inválido |
+| `409` | El `email` ya está registrado |
+
+---
+
+### `POST /api/users/login`
+
+Autentica por email + password (texto plano, demo). **No** emite token ni sesión.
+
+| Campo | Valor |
+|---|---|
+| **Método** | `POST` |
+| **URL** | `/api/users/login` |
+| **Request body** | `LoginRequest` |
+
+**Request body**
+
+```json
+{
+  "email": "pedro@test.com",
+  "password": "1234"
+}
+```
+
+**Response body** `200 OK`
+
+```json
+{
+  "userId": 5,
+  "name": "Pedro",
+  "email": "pedro@test.com",
+  "onboardingComplete": true
+}
+```
+
+**Códigos HTTP**
+
+| Código | Descripción |
+|---|---|
+| `200` | Login correcto |
+| `400` | `email`/`password` ausentes o `email` inválido |
+| `401` | Password incorrecta (`Credenciales inválidas`) |
+| `404` | No existe un usuario con ese email |
+
+> **Convención de errores:** email inexistente → `404` (coherente con `ResourceNotFoundException` del resto del sistema); password incorrecta → `401`.
+
+---
+
+### `POST /api/users`
+
+Registra un usuario nuevo con datos mínimos. El perfil (`educationLevel`, `studyYear`, `worksInIT`, `skills`) queda vacío hasta completar el onboarding.
+
+| Campo | Valor |
+|---|---|
+| **Método** | `POST` |
+| **URL** | `/api/users` |
+| **Path params** | — |
+| **Request body** | `CreateUserRequest` |
+
+**Request body**
+
+```json
+{
+  "name": "Juan Perez",
+  "email": "juan@example.com"
+}
+```
+
+> `name` obligatorio (no vacío). `email` obligatorio, con formato válido y **único** en el sistema.
+
+**Response body** `201 Created`
+
+```json
+{
+  "userId": 2,
+  "name": "Juan Perez",
+  "email": "juan@example.com"
+}
+```
+
+**Códigos HTTP**
+
+| Código | Descripción |
+|---|---|
+| `201` | Usuario creado correctamente |
+| `400` | `name`/`email` ausentes o `email` con formato inválido |
+| `409` | El `email` ya está registrado |
+
+---
+
+### `GET /api/users/{id}`
+
+Devuelve la información del usuario y el estado de su onboarding.
+
+| Campo | Valor |
+|---|---|
+| **Método** | `GET` |
+| **URL** | `/api/users/{id}` |
+| **Path params** | `id` — ID del usuario |
+| **Request body** | — |
+
+**Response body** `200 OK` (usuario recién registrado, sin onboarding)
+
+```json
+{
+  "userId": 2,
+  "name": "Juan Perez",
+  "email": "juan@example.com",
+  "educationLevel": null,
+  "studyYear": null,
+  "worksInIT": null,
+  "onboardingComplete": false,
+  "skills": []
+}
+```
+
+**Códigos HTTP**
+
+| Código | Descripción |
+|---|---|
+| `200` | Usuario obtenido correctamente |
+| `404` | Usuario no encontrado |
+
+---
+
+### `PUT /api/users/{id}/onboarding`
+
+Completa el onboarding del perfil: actualiza los datos del usuario y **reemplaza por completo** sus skills por las indicadas.
+
+| Campo | Valor |
+|---|---|
+| **Método** | `PUT` |
+| **URL** | `/api/users/{id}/onboarding` |
+| **Path params** | `id` — ID del usuario |
+| **Request body** | `OnboardingRequest` |
+
+**Request body**
+
+```json
+{
+  "educationLevel": "UNIVERSITY_STUDENT",
+  "studyYear": 3,
+  "worksInIT": true,
+  "skills": [
+    { "skillId": 1, "level": 8 },
+    { "skillId": 2, "level": 7 }
+  ]
+}
+```
+
+> `educationLevel` y `worksInIT` obligatorios. `studyYear` opcional (aplica a estudiantes). `skills` debe tener al menos un elemento; cada `level` entre `1` y `10`. Las skills indicadas **reemplazan** las existentes (las anteriores se eliminan). Si alguna `skillId` no existe, la operación se rechaza con `404` **sin modificar** el perfil (validación previa).
+
+**Response body** `200 OK`
+
+```json
+{
+  "userId": 2,
+  "name": "Juan Perez",
+  "email": "juan@example.com",
+  "educationLevel": "UNIVERSITY_STUDENT",
+  "studyYear": 3,
+  "worksInIT": true,
+  "onboardingComplete": true,
+  "skills": [
+    { "skillId": 1, "name": "Java", "level": 8 },
+    { "skillId": 2, "name": "Spring Boot", "level": 7 }
+  ]
+}
+```
+
+**Códigos HTTP**
+
+| Código | Descripción |
+|---|---|
+| `200` | Onboarding completado correctamente |
+| `400` | Request inválido (campos obligatorios ausentes o `level` fuera de 1–10) |
+| `404` | Usuario o alguna `skillId` no encontrados |
+
+---
+
+### Flujo de onboarding (ejemplo de uso)
+
+```
+1. POST /api/users                  → 201 { userId: 2, ... }            (alta mínima)
+2. GET  /api/users/2                 → 200 { onboardingComplete: false } (perfil vacío)
+3. GET  /api/skills                  → catálogo para elegir skillIds
+4. PUT  /api/users/2/onboarding      → 200 { onboardingComplete: true }  (perfil completo)
+5. GET  /api/users/2                 → 200 { onboardingComplete: true }
+```
+
+---
+
 ## 4. ChatController
+
+> **Todos los endpoints de esta sección requieren el header `X-User-Id`** (usuario actor). Falta del header → `400`. Ver [Autenticación demo](#autenticación-demo-x-user-id).
 
 ### `POST /api/chats`
 
@@ -389,6 +638,8 @@ Eliminar un chat y todos sus mensajes asociados.
 
 **Caso de uso principal del sistema.** Recibe el prompt original del usuario, consulta su perfil en PostgreSQL, ejecuta las inferencias en Prolog y devuelve el prompt enriquecido junto con las inferencias aplicadas. En esta etapa **no se consulta ningún modelo de IA**.
 
+> **Usuario:** se deriva del **dueño del chat** (`chat.user`). Este endpoint **no** requiere el header `X-User-Id`. Así, dos chats de usuarios distintos producen prompts enriquecidos distintos para la misma consulta (cada uno usa su perfil real).
+
 | Campo | Valor |
 |---|---|
 | **Método** | `POST` |
@@ -543,6 +794,110 @@ Reintentar la generación de la respuesta de IA para un mensaje que ya fue envia
 ```json
 {
   "level": "integer (1–10)"
+}
+```
+
+---
+
+### `RegisterUserRequest`
+
+```json
+{
+  "name": "string",
+  "email": "string (formato email, único)",
+  "password": "string (texto plano — demo)"
+}
+```
+
+---
+
+### `RegisterUserResponse`
+
+```json
+{
+  "userId": 5,
+  "onboardingComplete": false
+}
+```
+
+---
+
+### `LoginRequest`
+
+```json
+{
+  "email": "string",
+  "password": "string (texto plano — demo)"
+}
+```
+
+---
+
+### `LoginResponse`
+
+```json
+{
+  "userId": 5,
+  "name": "string",
+  "email": "string",
+  "onboardingComplete": true
+}
+```
+
+---
+
+### `CreateUserRequest`
+
+```json
+{
+  "name": "string",
+  "email": "string (formato email, único)"
+}
+```
+
+---
+
+### `CreateUserResponse`
+
+```json
+{
+  "userId": 2,
+  "name": "string",
+  "email": "string"
+}
+```
+
+---
+
+### `OnboardingRequest`
+
+```json
+{
+  "educationLevel": "SECONDARY_STUDENT | TERTIARY_STUDENT | UNIVERSITY_STUDENT | GRADUATED | POSTGRADUATE",
+  "studyYear": "integer | null",
+  "worksInIT": "boolean",
+  "skills": [
+    { "skillId": "integer", "level": "integer (1–10)" }
+  ]
+}
+```
+
+---
+
+### `UserResponse`
+
+`onboardingComplete` es calculado (no persistido). Los campos de perfil pueden ser `null` antes de completar el onboarding.
+
+```json
+{
+  "userId": 2,
+  "name": "string",
+  "email": "string",
+  "educationLevel": "EducationLevel | null",
+  "studyYear": "integer | null",
+  "worksInIT": "boolean | null",
+  "onboardingComplete": false,
+  "skills": ["SkillResponse"]
 }
 ```
 

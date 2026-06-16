@@ -21,8 +21,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ProfileController {
 
-    // Sustituir por SecurityContext cuando se implemente autenticación
-    private static final Long FIXED_USER_ID = 1L;
+    // Identidad del usuario (demo, sin Spring Security): header X-User-Id.
+    private static final String USER_ID_HEADER = "X-User-Id";
 
     private final ProfileService profileService;
 
@@ -34,8 +34,9 @@ public class ProfileController {
             content = @Content(schema = @Schema(implementation = ProfileResponse.class)))
     @ApiResponse(responseCode = "404", description = "Perfil no encontrado")
     @GetMapping
-    public ResponseEntity<ProfileResponse> getProfile() {
-        return ResponseEntity.ok(profileService.getProfile(FIXED_USER_ID));
+    public ResponseEntity<ProfileResponse> getProfile(
+            @RequestHeader(USER_ID_HEADER) Long userId) {
+        return ResponseEntity.ok(profileService.getProfile(userId));
     }
 
     @Operation(
@@ -48,10 +49,11 @@ public class ProfileController {
     @ApiResponse(responseCode = "404", description = "Skill no encontrada")
     @PutMapping("/skills/{skillId}")
     public ResponseEntity<SkillResponse> updateSkillLevel(
+            @RequestHeader(USER_ID_HEADER) Long userId,
             @Parameter(description = "ID de la skill a actualizar", required = true)
             @PathVariable Long skillId,
             @Valid @RequestBody UpdateSkillLevelRequest request
     ) {
-        return ResponseEntity.ok(profileService.updateSkillLevel(FIXED_USER_ID, skillId, request.level()));
+        return ResponseEntity.ok(profileService.updateSkillLevel(userId, skillId, request.level()));
     }
 }

@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AIController {
 
-    // Sustituir por SecurityContext cuando se implemente autenticación
-    private static final Long FIXED_USER_ID = 1L;
+    // Identidad del usuario (demo, sin Spring Security): header X-User-Id.
+    private static final String USER_ID_HEADER = "X-User-Id";
 
     private final AIService aiService;
 
@@ -39,10 +39,11 @@ public class AIController {
     @ApiResponse(responseCode = "503", description = "Servicio de IA no disponible")
     @PostMapping("/{messageId}/send")
     public ResponseEntity<SendMessageResponse> sendMessage(
+            @RequestHeader(USER_ID_HEADER) Long userId,
             @Parameter(description = "ID del mensaje a enviar", required = true)
             @PathVariable Long messageId
     ) {
-        SendMessageResponse response = aiService.sendMessage(FIXED_USER_ID, messageId);
+        SendMessageResponse response = aiService.sendMessage(userId, messageId);
         return ResponseEntity.ok(response);
     }
 
@@ -59,10 +60,11 @@ public class AIController {
     @ApiResponse(responseCode = "503", description = "Servicio de IA no disponible")
     @PostMapping("/{messageId}/retry")
     public ResponseEntity<SendMessageResponse> retryMessage(
+            @RequestHeader(USER_ID_HEADER) Long userId,
             @Parameter(description = "ID del mensaje a reintentar", required = true)
             @PathVariable Long messageId
     ) {
-        SendMessageResponse response = aiService.retryMessage(FIXED_USER_ID, messageId);
+        SendMessageResponse response = aiService.retryMessage(userId, messageId);
         return ResponseEntity.ok(response);
     }
 }

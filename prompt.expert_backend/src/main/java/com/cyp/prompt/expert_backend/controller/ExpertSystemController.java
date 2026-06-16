@@ -20,19 +20,17 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ExpertSystemController {
 
-    // Sustituir por SecurityContext cuando se implemente autenticación
-    private static final Long FIXED_USER_ID = 1L;
-
     private final ExpertSystemService expertSystemService;
 
     @Operation(
             summary = "Enriquecer prompt",
             description = """
                     Caso de uso principal del sistema.
-                    Recibe el prompt original del usuario, consulta su perfil en PostgreSQL,
-                    ejecuta las inferencias en Prolog y devuelve el prompt enriquecido junto
-                    con las inferencias aplicadas. No consulta ningún modelo de IA en esta etapa.
-                    El mensaje se persiste con aiResponse: null.
+                    Recibe el prompt original del usuario, consulta el perfil del DUEÑO del chat
+                    en PostgreSQL, ejecuta las inferencias en Prolog y devuelve el prompt
+                    enriquecido junto con las inferencias aplicadas. No consulta ningún modelo de
+                    IA en esta etapa. El mensaje se persiste con aiResponse: null.
+                    El usuario se deriva del chat (chat.user), no de un id externo.
                     """
     )
     @ApiResponse(responseCode = "201", description = "Prompt enriquecido generado y mensaje persistido",
@@ -46,7 +44,7 @@ public class ExpertSystemController {
             @PathVariable Long chatId,
             @Valid @RequestBody EnrichPromptRequest request
     ) {
-        EnrichPromptResponse response = expertSystemService.enrichPrompt(FIXED_USER_ID, chatId, request);
+        EnrichPromptResponse response = expertSystemService.enrichPrompt(chatId, request);
         return ResponseEntity.status(201).body(response);
     }
 }

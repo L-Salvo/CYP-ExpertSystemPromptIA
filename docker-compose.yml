@@ -1,13 +1,15 @@
 # =============================================================
-# Docker Compose — Backend + PostgreSQL + Prolog real
+# Docker Compose — Stack completo (4 servicios)
 # -------------------------------------------------------------
 # Servicios:
 #   postgres  — base de datos
 #   prolog    — motor de inferencias SWI-Prolog (servicio real)
 #   backend   — Spring Boot; usa PrologRestClient contra `prolog`
+#   frontend  — SPA React (Vite) servido por nginx, que ademas hace
+#               reverse-proxy de /api hacia `backend` (mismo origen,
+#               sin CORS)
 #
 # NO incluye todavía:
-#   - frontend
 #   - proveedor real de IA (AI sigue en mock)
 # =============================================================
 
@@ -92,6 +94,37 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+    networks:
+      - app-network
+
+  # ---------------------------------------------------------
+  # Frontend — SPA React (Vite) servido por nginx
+  # ---------------------------------------------------------
+  # nginx sirve los estáticos y hace reverse-proxy de /api → backend.
+  # El navegador habla solo con el frontend (puerto 3000) → sin CORS.
+  frontend:
+    build:
+      context: ./prompt.expert_frontend
+      args:
+        # Imagen productiva: mocks apagados → consume la API real del backend.
+        VITE_USE_MOCKS: "false"
+    container_name: cyp-frontend
+    depends_on:
+      # Espera a que el backend esté healthy: nginx resuelve `backend`
+      # al arrancar y así el proxy /api funciona desde la primera request.
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    healthcheck:
+      # busybox wget (incluido en nginx:alpine): confirma que nginx responde.
+      # 127.0.0.1 (no localhost): busybox resuelve localhost→::1 e IPv6 no
+      # está escuchado (nginx listen 80 = IPv4), lo que daría falso unhealthy.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - app-network
 

@@ -24,8 +24,9 @@ ON CONFLICT (name) DO NOTHING;
 -- -------------------------------------------------------------
 -- Usuario de desarrollo (ID=1 garantizado al ser el primero)
 -- -------------------------------------------------------------
-INSERT INTO users (name, email, education_level, study_year, works_in_it)
-VALUES ('Lautaro', 'lautaro@example.com', 'UNIVERSITY_STUDENT', 3, true)
+-- password en TEXTO PLANO ('1234'): simplificación de la demo académica (sin hashing).
+INSERT INTO users (name, email, password, education_level, study_year, works_in_it)
+VALUES ('Lautaro', 'lautaro@example.com', '1234', 'UNIVERSITY_STUDENT', 3, true)
 ON CONFLICT (email) DO NOTHING;
 
 -- -------------------------------------------------------------

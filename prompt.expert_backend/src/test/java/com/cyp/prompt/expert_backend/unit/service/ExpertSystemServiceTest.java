@@ -38,7 +38,6 @@ import com.cyp.prompt.expert_backend.exception.ExternalServiceException;
 import com.cyp.prompt.expert_backend.exception.ResourceNotFoundException;
 import com.cyp.prompt.expert_backend.repository.ChatRepository;
 import com.cyp.prompt.expert_backend.repository.MessageRepository;
-import com.cyp.prompt.expert_backend.repository.UserRepository;
 import com.cyp.prompt.expert_backend.repository.UserSkillRepository;
 import com.cyp.prompt.expert_backend.service.ExpertSystemService;
 import com.cyp.prompt.expert_backend.service.PromptBuilder;
@@ -60,8 +59,6 @@ class ExpertSystemServiceTest {
     private ChatRepository chatRepository;
     @Mock
     private MessageRepository messageRepository;
-    @Mock
-    private UserRepository userRepository;
     @Mock
     private UserSkillRepository userSkillRepository;
     @Mock
@@ -97,8 +94,8 @@ class ExpertSystemServiceTest {
 
     /** Configura el camino feliz completo. Todas las stubs se ejercitan en cada test. */
     private void stubHappyPath() {
-        given(chatRepository.findByIdAndUserId(CHAT_ID, USER_ID)).willReturn(Optional.of(chat));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        // El usuario se deriva del chat (chat.getUser()); no se consulta por userId.
+        given(chatRepository.findById(CHAT_ID)).willReturn(Optional.of(chat));
         given(userSkillRepository.findByUserId(USER_ID)).willReturn(List.of(javaSkill));
         given(prologClient.infer(any(PrologRequest.class))).willReturn(prologResponse);
         given(promptBuilder.buildEnrichedPrompt(eq(PROMPT), eq(prologResponse))).willReturn("ENRICHED");
@@ -114,7 +111,7 @@ class ExpertSystemServiceTest {
     void enrichPrompt_buildsPrologRequestAndCallsClient() {
         stubHappyPath();
 
-        expertSystemService.enrichPrompt(USER_ID, CHAT_ID, request);
+        expertSystemService.enrichPrompt(CHAT_ID, request);
 
         ArgumentCaptor<PrologRequest> captor = ArgumentCaptor.forClass(PrologRequest.class);
         verify(prologClient).infer(captor.capture());
@@ -133,7 +130,7 @@ class ExpertSystemServiceTest {
     void enrichPrompt_usesPromptBuilder() {
         stubHappyPath();
 
-        EnrichPromptResponse response = expertSystemService.enrichPrompt(USER_ID, CHAT_ID, request);
+        EnrichPromptResponse response = expertSystemService.enrichPrompt(CHAT_ID, request);
 
         verify(promptBuilder).buildEnrichedPrompt(PROMPT, prologResponse);
         assertThat(response.enrichedPrompt()).isEqualTo("ENRICHED");
@@ -144,7 +141,7 @@ class ExpertSystemServiceTest {
     void enrichPrompt_persistsMessage() {
         stubHappyPath();
 
-        EnrichPromptResponse response = expertSystemService.enrichPrompt(USER_ID, CHAT_ID, request);
+        EnrichPromptResponse response = expertSystemService.enrichPrompt(CHAT_ID, request);
 
         ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
         verify(messageRepository).save(captor.capture());
@@ -164,11 +161,11 @@ class ExpertSystemServiceTest {
     }
 
     @Test
-    @DisplayName("ownership: lanza 404 si el chat no pertenece al usuario y no toca Prolog")
-    void enrichPrompt_chatNotOwned_throws() {
-        given(chatRepository.findByIdAndUserId(CHAT_ID, USER_ID)).willReturn(Optional.empty());
+    @DisplayName("lanza 404 si el chat no existe y no toca Prolog")
+    void enrichPrompt_chatNotFound_throws() {
+        given(chatRepository.findById(CHAT_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> expertSystemService.enrichPrompt(USER_ID, CHAT_ID, request))
+        assertThatThrownBy(() -> expertSystemService.enrichPrompt(CHAT_ID, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining(String.valueOf(CHAT_ID));
 
@@ -179,13 +176,13 @@ class ExpertSystemServiceTest {
     @Test
     @DisplayName("propaga ExternalServiceException si Prolog no está disponible y no persiste")
     void enrichPrompt_prologUnavailable_propagates() {
-        given(chatRepository.findByIdAndUserId(CHAT_ID, USER_ID)).willReturn(Optional.of(chat));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        // El usuario se deriva del chat; solo se consultan chat y skills antes de Prolog.
+        given(chatRepository.findById(CHAT_ID)).willReturn(Optional.of(chat));
         given(userSkillRepository.findByUserId(USER_ID)).willReturn(List.of(javaSkill));
         given(prologClient.infer(any(PrologRequest.class)))
                 .willThrow(new ExternalServiceException("Prolog caído"));
 
-        assertThatThrownBy(() -> expertSystemService.enrichPrompt(USER_ID, CHAT_ID, request))
+        assertThatThrownBy(() -> expertSystemService.enrichPrompt(CHAT_ID, request))
                 .isInstanceOf(ExternalServiceException.class);
 
         verifyNoInteractions(promptBuilder);

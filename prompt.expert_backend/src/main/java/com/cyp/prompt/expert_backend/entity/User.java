@@ -43,14 +43,23 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    // DEMO ACADÉMICA: contraseña en TEXTO PLANO, sin hashing ni Spring Security.
+    // Simplificación deliberada — NO apto para producción (ver doc de auth demo).
+    // Nullable: los usuarios creados por la vía legacy (POST /api/users) pueden no tenerla.
+    @Column
+    private String password;
+
+    // Nullable: un usuario recién registrado todavía no completó el onboarding.
+    // Estos campos se llenan en PUT /api/users/{id}/onboarding. Su ausencia es
+    // justamente lo que permite calcular onboardingComplete (ver UserService).
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column
     private EducationLevel educationLevel;
 
     @Column
     private Integer studyYear;
 
-    @Column(name = "works_in_it", nullable = false)
+    @Column(name = "works_in_it")
     private Boolean worksInIT;
 
     @CreationTimestamp
