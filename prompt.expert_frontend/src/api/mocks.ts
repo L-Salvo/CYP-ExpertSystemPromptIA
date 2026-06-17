@@ -10,16 +10,32 @@ import type {
   SendMessageResponse,
   RenameChatResponse,
   SkillResponse,
+  EducationLevel,
+  RegisterUserResponse,
+  LoginResponse,
+  UserResponse,
 } from '../types/api.types';
 
 // ============================================================
 // Base de Datos Simulada en LocalStorage
 // ============================================================
 
-const STORAGE_KEY = 'prompt_expert_mock_db';
+const STORAGE_KEY = 'prompt_expert_mock_db_v2';
+
+interface MockUser {
+  userId: number;
+  name: string;
+  email: string;
+  password: string; // texto plano — demo
+  educationLevel: EducationLevel | null;
+  studyYear: number | null;
+  worksInIT: boolean | null;
+  skills: SkillResponse[];
+  createdAt: string;
+}
 
 interface MockDB {
-  profile: ProfileResponse;
+  users: MockUser[];
   skillsCatalog: SkillCatalogItem[];
   chats: ChatResponse[];
   messages: Record<number, MessageResponse[]>;
@@ -38,20 +54,23 @@ const DEFAULT_CATALOG: SkillCatalogItem[] = [
   { skillId: 10, name: 'Git', category: 'OTHER' },
 ];
 
-const DEFAULT_PROFILE: ProfileResponse = {
-  userId: 1,
-  name: 'Lautaro',
-  email: 'lautaro@example.com',
-  educationLevel: 'UNIVERSITY_STUDENT',
-  studyYear: 3,
-  worksInIT: true,
-  skills: [
-    { skillId: 1, name: 'Java', level: 8 },
-    { skillId: 3, name: 'Docker', level: 2 },
-    { skillId: 4, name: 'PostgreSQL', level: 5 },
-  ],
-  createdAt: new Date('2026-01-15T10:00:00Z').toISOString(),
-};
+const DEFAULT_USERS: MockUser[] = [
+  {
+    userId: 1,
+    name: 'Lautaro',
+    email: 'lautaro@example.com',
+    password: 'demo',
+    educationLevel: 'UNIVERSITY_STUDENT',
+    studyYear: 3,
+    worksInIT: true,
+    skills: [
+      { skillId: 1, name: 'Java', level: 8 },
+      { skillId: 3, name: 'Docker', level: 2 },
+      { skillId: 4, name: 'PostgreSQL', level: 5 },
+    ],
+    createdAt: new Date('2026-01-15T10:00:00Z').toISOString(),
+  },
+];
 
 const DEFAULT_CHATS: ChatResponse[] = [
   {
@@ -69,9 +88,11 @@ const DEFAULT_MESSAGES: Record<number, MessageResponse[]> = {
       messageId: 15,
       chatId: 12,
       originalPrompt: 'Explícame Docker',
-      enrichedPrompt: 'El usuario es estudiante universitario de tercer año que trabaja en IT y tiene nivel avanzado en Java (8/10) pero nivel inicial en Docker (2/10). Explícame Docker desde una perspectiva de backend Java, usando Maven y el ecosistema JVM como punto de referencia.',
+      enrichedPrompt:
+        'El usuario es estudiante universitario de tercer año que trabaja en IT y tiene nivel avanzado en Java (8/10) pero nivel inicial en Docker (2/10). Explícame Docker desde una perspectiva de backend Java, usando Maven y el ecosistema JVM como punto de referencia.',
       appliedInferences: ['backend_developer', 'needs_docker', 'use_java_examples'],
-      aiResponse: 'Docker es una plataforma de contenedores que permite empaquetar aplicaciones junto con sus dependencias en unidades aisladas llamadas contenedores. Pensándolo desde Java: es similar a tener un JAR ejecutable, pero que incluye también el JDK, el sistema operativo y todas las dependencias del sistema. Como tienes nivel inicial (2/10), lo mejor es ver un ejemplo simple de Dockerfile para una app Spring Boot con Maven...',
+      aiResponse:
+        'Docker es una plataforma de contenedores que permite empaquetar aplicaciones junto con sus dependencias en unidades aisladas llamadas contenedores. Pensándolo desde Java: es similar a tener un JAR ejecutable, pero que incluye también el JDK, el sistema operativo y todas las dependencias del sistema. Como tienes nivel inicial (2/10), lo mejor es ver un ejemplo simple de Dockerfile para una app Spring Boot con Maven...',
       createdAt: new Date('2026-06-10T14:05:00Z').toISOString(),
     },
   ],
@@ -87,7 +108,7 @@ function loadDB(): MockDB {
     }
   }
   const db: MockDB = {
-    profile: DEFAULT_PROFILE,
+    users: DEFAULT_USERS,
     skillsCatalog: DEFAULT_CATALOG,
     chats: DEFAULT_CHATS,
     messages: DEFAULT_MESSAGES,
@@ -98,6 +119,57 @@ function loadDB(): MockDB {
 
 function saveDB(db: MockDB) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+}
+
+// ============================================================
+// Helpers de usuario
+// ============================================================
+
+const STUDENT_LEVELS: EducationLevel[] = ['SECONDARY_STUDENT', 'TERTIARY_STUDENT', 'UNIVERSITY_STUDENT'];
+
+function computeOnboardingComplete(u: MockUser): boolean {
+  if (u.educationLevel == null || u.worksInIT == null) return false;
+  const yearOk = STUDENT_LEVELS.includes(u.educationLevel) ? u.studyYear != null : true;
+  return yearOk && u.skills.length > 0;
+}
+
+function toProfileResponse(u: MockUser): ProfileResponse {
+  return {
+    userId: u.userId,
+    name: u.name,
+    email: u.email,
+    educationLevel: u.educationLevel as EducationLevel,
+    studyYear: u.studyYear,
+    worksInIT: u.worksInIT as boolean,
+    skills: u.skills,
+    createdAt: u.createdAt,
+  };
+}
+
+function toUserResponse(u: MockUser): UserResponse {
+  return {
+    userId: u.userId,
+    name: u.name,
+    email: u.email,
+    educationLevel: u.educationLevel,
+    studyYear: u.studyYear,
+    worksInIT: u.worksInIT,
+    onboardingComplete: computeOnboardingComplete(u),
+    skills: u.skills,
+  };
+}
+
+function getHeader(config: AxiosRequestConfig, name: string): string | undefined {
+  const h: any = config.headers;
+  if (!h) return undefined;
+  if (typeof h.get === 'function') return h.get(name) ?? undefined;
+  return h[name] ?? h[name.toLowerCase()];
+}
+
+function getActiveUser(db: MockDB, config: AxiosRequestConfig): MockUser | undefined {
+  const raw = getHeader(config, 'X-User-Id');
+  const id = raw ? parseInt(String(raw), 10) : 1;
+  return db.users.find((u) => u.userId === id) ?? db.users[0];
 }
 
 // ============================================================
@@ -121,7 +193,12 @@ function makeErrorResponse(message: string, status = 404, config: AxiosRequestCo
       status,
       data: {
         status,
-        error: status === 400 ? 'Bad Request' : status === 404 ? 'Not Found' : 'Internal Server Error',
+        error:
+          status === 400 ? 'Bad Request'
+          : status === 401 ? 'Unauthorized'
+          : status === 404 ? 'Not Found'
+          : status === 409 ? 'Conflict'
+          : 'Internal Server Error',
         message,
         timestamp: new Date().toISOString(),
       },
@@ -129,6 +206,8 @@ function makeErrorResponse(message: string, status = 404, config: AxiosRequestCo
   };
   return Promise.reject(errorObj);
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ============================================================
 // Custom Axios Adapter
@@ -142,19 +221,129 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
   const db = loadDB();
   const url = config.url || '';
   const method = (config.method || 'GET').toUpperCase();
-  
+
   // Limpiar query params de la URL para el ruteo básico
   const [cleanUrl] = url.split('?');
-  
+
   // Parsear el body si es string
   let body: any = null;
   if (config.data) {
     body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
   }
 
+  // ──────────────────────────────────────────────────────────
+  // USERS — Registro, Login, Onboarding
+  // ──────────────────────────────────────────────────────────
+
+  // POST /api/users/register
+  if (cleanUrl === '/users/register' && method === 'POST') {
+    const { name, email, password } = body ?? {};
+    if (!name || !email || !password) {
+      return makeErrorResponse('name, email y password son obligatorios', 400, config);
+    }
+    if (!EMAIL_RE.test(email)) {
+      return makeErrorResponse('Formato de email inválido', 400, config);
+    }
+    if (db.users.some((u) => u.email.toLowerCase() === String(email).toLowerCase())) {
+      return makeErrorResponse('El email ya está registrado', 409, config);
+    }
+    const newId = db.users.length > 0 ? Math.max(...db.users.map((u) => u.userId)) + 1 : 1;
+    const newUser: MockUser = {
+      userId: newId,
+      name,
+      email,
+      password,
+      educationLevel: null,
+      studyYear: null,
+      worksInIT: null,
+      skills: [],
+      createdAt: new Date().toISOString(),
+    };
+    db.users.push(newUser);
+    saveDB(db);
+    const res: RegisterUserResponse = { userId: newId, onboardingComplete: false };
+    return makeResponse(res, 201, config);
+  }
+
+  // POST /api/users/login
+  if (cleanUrl === '/users/login' && method === 'POST') {
+    const { email, password } = body ?? {};
+    if (!email || !password) {
+      return makeErrorResponse('email y password son obligatorios', 400, config);
+    }
+    const user = db.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
+    if (!user) {
+      return makeErrorResponse('No existe un usuario con ese email', 404, config);
+    }
+    if (user.password !== password) {
+      return makeErrorResponse('Credenciales inválidas', 401, config);
+    }
+    const res: LoginResponse = {
+      userId: user.userId,
+      name: user.name,
+      email: user.email,
+      onboardingComplete: computeOnboardingComplete(user),
+    };
+    return makeResponse(res, 200, config);
+  }
+
+  // GET /api/users/{id}
+  if (cleanUrl.startsWith('/users/') && method === 'GET') {
+    const id = parseInt(cleanUrl.substring('/users/'.length), 10);
+    const user = db.users.find((u) => u.userId === id);
+    if (isNaN(id) || !user) {
+      return makeErrorResponse(`Usuario con ID ${id} no encontrado`, 404, config);
+    }
+    return makeResponse(toUserResponse(user), 200, config);
+  }
+
+  // PUT /api/users/{id}/onboarding
+  if (cleanUrl.startsWith('/users/') && cleanUrl.endsWith('/onboarding') && method === 'PUT') {
+    const parts = cleanUrl.split('/');
+    const id = parseInt(parts[2], 10);
+    const userIdx = db.users.findIndex((u) => u.userId === id);
+    if (isNaN(id) || userIdx === -1) {
+      return makeErrorResponse(`Usuario con ID ${id} no encontrado`, 404, config);
+    }
+    const { educationLevel, studyYear, worksInIT, skills } = body ?? {};
+    if (!educationLevel || typeof worksInIT !== 'boolean') {
+      return makeErrorResponse('educationLevel y worksInIT son obligatorios', 400, config);
+    }
+    if (!Array.isArray(skills) || skills.length === 0) {
+      return makeErrorResponse('Debe indicar al menos una skill', 400, config);
+    }
+    for (const s of skills) {
+      if (typeof s.level !== 'number' || s.level < 1 || s.level > 10) {
+        return makeErrorResponse('Cada nivel debe estar entre 1 y 10', 400, config);
+      }
+    }
+    // Validación previa: todas las skillIds deben existir (sin modificar el perfil)
+    const resolved: SkillResponse[] = [];
+    for (const s of skills) {
+      const cat = db.skillsCatalog.find((c) => c.skillId === s.skillId);
+      if (!cat) {
+        return makeErrorResponse(`Skill con ID ${s.skillId} no encontrada`, 404, config);
+      }
+      resolved.push({ skillId: cat.skillId, name: cat.name, level: s.level });
+    }
+    const user = db.users[userIdx];
+    user.educationLevel = educationLevel;
+    user.studyYear = STUDENT_LEVELS.includes(educationLevel) ? (studyYear ?? null) : null;
+    user.worksInIT = worksInIT;
+    user.skills = resolved;
+    saveDB(db);
+    return makeResponse(toUserResponse(user), 200, config);
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // PROFILE (usuario activo por X-User-Id)
+  // ──────────────────────────────────────────────────────────
+
   // 1. GET /api/profile
   if (cleanUrl === '/profile' && method === 'GET') {
-    return makeResponse(db.profile, 200, config);
+    const user = getActiveUser(db, config);
+    if (!user) return makeErrorResponse('Perfil no encontrado', 404, config);
+    return makeResponse(toProfileResponse(user), 200, config);
   }
 
   // 2. PUT /api/profile/skills/{skillId}
@@ -172,20 +361,17 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
       return makeErrorResponse(`Habilidad con ID ${skillId} no existe en el catálogo`, 404, config);
     }
 
-    // Actualizar o agregar skill en el perfil
+    const user = getActiveUser(db, config);
+    if (!user) return makeErrorResponse('Perfil no encontrado', 404, config);
+
     let updatedSkill: SkillResponse;
-    const existingSkillIdx = db.profile.skills.findIndex((s) => s.skillId === skillId);
+    const existingSkillIdx = user.skills.findIndex((s) => s.skillId === skillId);
     if (existingSkillIdx !== -1) {
-      db.profile.skills[existingSkillIdx].level = level;
-      updatedSkill = db.profile.skills[existingSkillIdx];
+      user.skills[existingSkillIdx].level = level;
+      updatedSkill = user.skills[existingSkillIdx];
     } else {
-      const newSkill: SkillResponse = {
-        skillId,
-        name: catalogItem.name,
-        level,
-      };
-      db.profile.skills.push(newSkill);
-      updatedSkill = newSkill;
+      updatedSkill = { skillId, name: catalogItem.name, level };
+      user.skills.push(updatedSkill);
     }
 
     saveDB(db);
@@ -194,7 +380,6 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
 
   // 3. GET /api/skills
   if (cleanUrl === '/skills' && method === 'GET') {
-    // Leer parámetro category
     const category = config.params?.category || new URLSearchParams(url.split('?')[1] || '').get('category');
     if (category) {
       const upperCategory = category.toUpperCase();
@@ -210,7 +395,6 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
 
   // 4. GET /api/chats
   if (cleanUrl === '/chats' && method === 'GET') {
-    // Ordenar chats por updatedAt descendente
     const sortedChats = [...db.chats].sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
@@ -221,7 +405,7 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
   if (cleanUrl === '/chats' && method === 'POST') {
     const title = body?.title || 'Nuevo Chat';
     const newId = db.chats.length > 0 ? Math.max(...db.chats.map((c) => c.chatId)) + 1 : 1;
-    
+
     const newChat: ChatResponse = {
       chatId: newId,
       title,
@@ -317,18 +501,19 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
       return makeErrorResponse('El prompt no puede estar vacío', 400, config);
     }
 
-    // Simular inferencias de Prolog basadas en las skills del usuario
+    // El usuario se deriva del dueño del chat; en el mock usamos el usuario activo.
+    const user = getActiveUser(db, config) ?? db.users[0];
+
     const inferences: string[] = ['student_profile'];
     const recommendations: string[] = [];
 
-    // Ver si el usuario tiene Java, Docker, etc.
-    const javaSkill = db.profile.skills.find((s) => s.name.toLowerCase() === 'java');
-    const dockerSkill = db.profile.skills.find((s) => s.name.toLowerCase() === 'docker');
-    
-    if (db.profile.worksInIT) {
+    const javaSkill = user.skills.find((s) => s.name.toLowerCase() === 'java');
+    const dockerSkill = user.skills.find((s) => s.name.toLowerCase() === 'docker');
+
+    if (user.worksInIT) {
       inferences.push('works_in_it');
     }
-    
+
     if (javaSkill) {
       if (javaSkill.level >= 7) {
         inferences.push('expert_java');
@@ -349,11 +534,10 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
       }
     }
 
-    // Generar prompt enriquecido mockeado
-    const userSummary = `El usuario es ${db.profile.educationLevel.toLowerCase().replace('_', ' ')} que ${db.profile.worksInIT ? 'trabaja' : 'no trabaja'} en IT. Nivel de Java: ${javaSkill?.level || 0}/10. Nivel de Docker: ${dockerSkill?.level || 0}/10.`;
+    const eduText = (user.educationLevel ?? 'unknown').toLowerCase().replace('_', ' ');
+    const userSummary = `El usuario es ${eduText} que ${user.worksInIT ? 'trabaja' : 'no trabaja'} en IT. Nivel de Java: ${javaSkill?.level || 0}/10. Nivel de Docker: ${dockerSkill?.level || 0}/10.`;
     const enrichedPrompt = `[System Context: ${userSummary} Inferences: [${inferences.join(', ')}]] ${prompt}. Por favor, adapta la respuesta a mi perfil técnico y nivel de conocimiento.`;
 
-    // Obtener un nuevo ID de mensaje
     let maxMsgId = 0;
     Object.values(db.messages).forEach((msgs) => {
       msgs.forEach((m) => {
@@ -372,13 +556,11 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
       createdAt: new Date().toISOString(),
     };
 
-    // Inicializar mensajes si no existe
     if (!db.messages[chatId]) {
       db.messages[chatId] = [];
     }
     db.messages[chatId].push(newMessage);
 
-    // Actualizar metadata del chat
     db.chats[chatIdx].messageCount = db.messages[chatId].length;
     db.chats[chatIdx].updatedAt = new Date().toISOString();
 
@@ -401,7 +583,6 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
     const parts = cleanUrl.split('/');
     const messageId = parseInt(parts[2], 10);
 
-    // Buscar el mensaje en todos los chats
     let foundChatId = -1;
     let foundMsgIdx = -1;
 
@@ -423,15 +604,13 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
       return makeErrorResponse('El mensaje ya tiene respuesta de la IA. Usa /retry en su lugar.', 409, config);
     }
 
-    // Generar respuesta ficticia de IA basada en el prompt original
     const responseText = `Esta es una respuesta simulada por el mock del frontend para tu prompt: "${msg.originalPrompt}".\n\n` +
       `Se ha aplicado el contexto de tu perfil técnico:\n` +
       `- Inferencia detectada: ${msg.appliedInferences.join(', ')}\n\n` +
       `Como tu nivel de conocimientos ha sido considerado en la formulación del prompt enriquecido, la IA generaría una explicación adaptada a tu perfil. Para "Java" y "Docker", se asume una perspectiva del ecosistema backend de Spring Boot, simplificando la contenerización si es necesario.`;
 
     db.messages[foundChatId][foundMsgIdx].aiResponse = responseText;
-    
-    // Actualizar updatedAt del chat
+
     const chatIdx = db.chats.findIndex((c) => c.chatId === foundChatId);
     if (chatIdx !== -1) {
       db.chats[chatIdx].updatedAt = new Date().toISOString();
@@ -475,7 +654,6 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
 
     db.messages[foundChatId][foundMsgIdx].aiResponse = responseText;
 
-    // Actualizar updatedAt del chat
     const chatIdx = db.chats.findIndex((c) => c.chatId === foundChatId);
     if (chatIdx !== -1) {
       db.chats[chatIdx].updatedAt = new Date().toISOString();

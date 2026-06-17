@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProfile, updateSkillLevel } from '../api/profile.api';
+import { toast } from '../shared/ui';
 import type { UpdateSkillLevelRequest } from '../types/api.types';
 
 export const PROFILE_KEY = ['profile'] as const;
@@ -19,8 +20,12 @@ export function useUpdateSkill() {
   return useMutation({
     mutationFn: ({ skillId, payload }: { skillId: number; payload: UpdateSkillLevelRequest }) =>
       updateSkillLevel(skillId, payload),
-    onSuccess: () => {
+    onSuccess: (skill) => {
       qc.invalidateQueries({ queryKey: PROFILE_KEY });
+      toast.success(`Nivel de ${skill.name} actualizado`);
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err.message ?? 'No se pudo actualizar la skill');
     },
   });
 }

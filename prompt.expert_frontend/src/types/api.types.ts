@@ -37,6 +37,56 @@ export interface ProfileResponse {
   createdAt: string; // ISO-8601
 }
 
+// ── Auth & Onboarding (API_CONTRACT §3.bis) ──────────────────
+
+export interface RegisterUserRequest {
+  name: string;
+  email: string;
+  password: string; // texto plano — demo
+}
+
+export interface RegisterUserResponse {
+  userId: number;
+  onboardingComplete: boolean;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  userId: number;
+  name: string;
+  email: string;
+  onboardingComplete: boolean;
+}
+
+/** Skill seleccionada en el onboarding (skillId + nivel). */
+export interface OnboardingSkill {
+  skillId: number;
+  level: number; // 1–10
+}
+
+export interface OnboardingRequest {
+  educationLevel: EducationLevel;
+  studyYear: number | null;
+  worksInIT: boolean;
+  skills: OnboardingSkill[]; // reemplaza por completo las existentes; mínimo 1
+}
+
+/** GET /api/users/{id} y respuesta de onboarding. Campos de perfil null antes del onboarding. */
+export interface UserResponse {
+  userId: number;
+  name: string;
+  email: string;
+  educationLevel: EducationLevel | null;
+  studyYear: number | null;
+  worksInIT: boolean | null;
+  onboardingComplete: boolean;
+  skills: SkillResponse[];
+}
+
 // ── Requests ─────────────────────────────────────────────────
 
 export interface UpdateSkillLevelRequest {

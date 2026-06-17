@@ -15,32 +15,48 @@ const levelLabels: Record<number, string> = {
 
 export function Slider({ id, value, onChange, min = 1, max = 10, disabled }: SliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
+  const label = levelLabels[value];
 
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      <div className="flex items-center justify-between text-xs text-white/50">
+      <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
         <span>Nivel</span>
-        <span className="font-semibold text-white/80">
-          {value} / {max} — {levelLabels[value]}
+        <span className="font-semibold text-[var(--color-text-primary)]">
+          {value} / {max} — {label}
         </span>
       </div>
-      <div className="relative h-2 w-full rounded-full bg-white/08">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-white/70 transition-all duration-150"
-          style={{ width: `${pct}%` }}
+
+      <div className="relative h-5 flex items-center">
+        {/* Track */}
+        <div className="absolute inset-x-0 h-2 rounded-full bg-[var(--color-surface-4)]">
+          {/* Fill */}
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-[var(--color-aurora-2)] transition-all duration-150"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        {/* Native range input (interaction layer) — peer drives the thumb focus ring */}
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          disabled={disabled}
+          aria-valuetext={`${value} de ${max}, nivel ${label}`}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed m-0"
+        />
+
+        {/* Visible thumb */}
+        <span
+          aria-hidden="true"
+          className="absolute h-4 w-4 -translate-x-1/2 rounded-full bg-[var(--color-text-primary)] border-2 border-[var(--color-surface-1)] shadow transition-[left] duration-150
+            peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--focus-ring)] peer-focus-visible:ring-offset-0"
+          style={{ left: `${pct}%` }}
         />
       </div>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full appearance-none cursor-pointer bg-transparent h-2 opacity-0 absolute"
-        style={{ top: '-8px', position: 'relative' }}
-      />
     </div>
   );
 }

@@ -8,9 +8,9 @@ interface BadgeProps {
 
 const variantStyles: Record<string, string> = {
   default:
-    'bg-white/08 text-white/70 border border-white/10',
+    'bg-[var(--color-surface-3)] text-[var(--color-text-secondary)] border border-[var(--color-border)]',
   inference:
-    'bg-white/06 text-white/60 border border-white/08 font-mono text-xs',
+    'bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] border border-[var(--color-border)] font-mono text-xs',
   success:
     'bg-green-500/12 text-green-300 border border-green-500/20',
   warning:

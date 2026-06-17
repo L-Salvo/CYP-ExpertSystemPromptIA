@@ -13,11 +13,11 @@ const variantStyles: Record<Variant, string> = {
   primary:
     'bg-white text-black font-semibold hover:bg-white/90 active:scale-95',
   ghost:
-    'bg-transparent text-white/70 hover:bg-white/08 hover:text-white active:scale-95',
+    'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)] active:scale-95',
   danger:
-    'bg-transparent text-red-400 hover:bg-red-500/12 hover:text-red-300 active:scale-95',
+    'bg-transparent text-[var(--color-error)] hover:bg-[var(--color-error)]/12 active:scale-95',
   glass:
-    'glass text-white/80 hover:bg-white/08 hover:text-white active:scale-95',
+    'glass text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] active:scale-95',
 };
 
 const sizeStyles: Record<Size, string> = {

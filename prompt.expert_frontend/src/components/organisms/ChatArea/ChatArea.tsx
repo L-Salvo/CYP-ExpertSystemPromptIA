@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MessageBubble } from '../../molecules/MessageBubble';
 import { MessageInput } from '../MessageInput';
 import { Button } from '../../atoms/Button';
+import { Skeleton } from '../../../shared/ui';
 import { useChatStore } from '../../../store/chat.store';
 import { useChatDetail, chatDetailKey } from '../../../hooks/useChat';
 import { useCreateChat } from '../../../hooks/useChats';
@@ -28,17 +29,16 @@ export function ChatArea() {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [tempAiResponse, setTempAiResponse] = useState<string | null>(null);
 
-  const { data: chatDetail } = useChatDetail(activeChatId);
+  const { data: chatDetail, isLoading: isChatLoading } = useChatDetail(activeChatId);
   const { mutate: createChat, isPending: creatingChat } = useCreateChat();
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { mutate: enrichAndSend } = useMutation({
+    // pipelineState/pendingPrompt are already set by handleSubmit before this
+    // mutation starts (see below) — doing it there too, instead of here, avoids
+    // a render where activeChatId just changed but the pipeline still looks idle.
     mutationFn: async ({ chatId, prompt }: { chatId: number; prompt: string }) => {
-      setPipelineState('enriching');
-      setPendingPrompt(prompt);
-      setTempAiResponse(null);
-      
       // Fase 1: Enriquecer prompt con Prolog
       const enrichData = await enrichPrompt(chatId, { prompt });
       setPendingMessage(enrichData);
@@ -73,12 +73,13 @@ export function ChatArea() {
   };
 
   const messages = chatDetail?.messages ?? [];
-  const hasMessages = messages.length > 0 || pipelineState !== 'idle';
   const noChatSelected = activeChatId === null;
 
-  // Find if the pending message has already been saved as a message in the chat detail
+  // The pending message only counts as "saved" once the persisted copy actually
+  // has its AI response. Otherwise the intermediate fetch (enriched, aiResponse: null)
+  // would hide the virtual turn before the response is revealed — the new-chat bug.
   const isPendingMessageSaved = pendingMessage
-    ? messages.some((m) => m.messageId === pendingMessage.messageId)
+    ? messages.some((m) => m.messageId === pendingMessage.messageId && m.aiResponse !== null)
     : false;
 
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -98,6 +99,12 @@ export function ChatArea() {
     aiResponse: tempAiResponse,
     createdAt: new Date().toISOString(),
   } : null;
+
+  // While the virtual turn is active, drop its persisted (still response-less) twin
+  // from the list so they never collide on the same React key.
+  const displayMessages = virtualMsg
+    ? [...messages.filter((m) => m.messageId !== virtualMsg.messageId), virtualMsg]
+    : messages;
 
   const prevChatIdRef = useRef<number | null>(activeChatId);
 
@@ -123,7 +130,13 @@ export function ChatArea() {
     }
   }, [pipelineState]);
 
-  // Autoscroll as the container grows (e.g. during typewriter typing or message additions)
+  // Autoscroll as the container grows (e.g. during typewriter typing or thinking-step badges).
+  // Read through a ref so this effect mounts once and never re-subscribes the observer.
+  const pipelineStateRef = useRef(pipelineState);
+  useEffect(() => {
+    pipelineStateRef.current = pipelineState;
+  }, [pipelineState]);
+
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -131,22 +144,36 @@ export function ChatArea() {
     const innerContainer = scrollContainer.firstElementChild;
     if (!innerContainer) return;
 
+    let rafId: number | null = null;
+
     const resizeObserver = new ResizeObserver(() => {
+      // Only auto-follow the bottom while a turn is actively being processed
+      // (thinking steps growing, response typing). Once a turn is settled,
+      // expanding/collapsing its "Proceso de pensamiento" card must never
+      // move the viewport — the conversation stays exactly where it is.
+      if (pipelineStateRef.current === 'idle') return;
+
       const threshold = 150; // px
       const isNearBottom =
         scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight <= threshold;
+      if (!isNearBottom) return;
 
-      if (isNearBottom) {
+      // Coalesce rapid resize events (CSS expand transitions fire one per frame)
+      // into a single smooth glide instead of stacking instant jumps.
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
         scrollContainer.scrollTo({
           top: scrollContainer.scrollHeight,
-          behavior: 'auto',
+          behavior: 'smooth',
         });
-      }
+        rafId = null;
+      });
     });
 
     resizeObserver.observe(innerContainer);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
     };
   }, []);
@@ -161,6 +188,15 @@ export function ChatArea() {
       });
     }
 
+    // Flip into "processing" synchronously, before the chat even exists. This
+    // guarantees the virtual thinking turn is already showing by the time
+    // activeChatId changes below — otherwise there's an in-between render
+    // (chat just created, detail query loading, pipeline still idle) where the
+    // view briefly resolves to loading/empty and remounts, causing a visible jump.
+    setPipelineState('enriching');
+    setPendingPrompt(prompt);
+    setTempAiResponse(null);
+
     if (activeChatId) {
       enrichAndSend({ chatId: activeChatId, prompt });
     } else {
@@ -169,6 +205,11 @@ export function ChatArea() {
         {
           onSuccess: (newChat) => {
             setActiveChatId(newChat.chatId);
+            // setActiveChatId resets pipelineState to 'idle' as a side effect
+            // (meant to clear a stale pipeline when switching to a different
+            // existing chat). Re-affirm 'enriching' right after, so this brand
+            // new chat never has a render where the pipeline looks idle.
+            setPipelineState('enriching');
             enrichAndSend({ chatId: newChat.chatId, prompt });
           },
           onError: (err: any) => {
@@ -182,69 +223,123 @@ export function ChatArea() {
 
   const busy = creatingChat || pipelineState === 'enriching' || pipelineState === 'sending';
 
+  // Single source of truth for what fills the conversation area. Rendered through
+  // one AnimatePresence so the states crossfade cleanly instead of popping/overlapping.
+  //
+  // The `pipelineState !== 'idle'` branch is a deliberate safety net: while a turn
+  // is being processed (right after submit, even before the new chat/virtual
+  // message has fully materialized) the loading skeleton must never be able to
+  // show — only the thinking process and, eventually, the response.
+  const view: 'welcome' | 'loading' | 'empty' | 'content' =
+    noChatSelected ? 'welcome'
+    : displayMessages.length > 0 || pipelineState !== 'idle' ? 'content'
+    : isChatLoading && !busy ? 'loading'
+    : 'empty';
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* ── Messages / Welcome area ───────────────────────────── */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden py-6">
+      {/* scrollbar-gutter reserves the scrollbar's space at all times, so it
+          appearing/disappearing as the thinking-process card expands never
+          shifts the content horizontally. */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden py-6 [scrollbar-gutter:stable]"
+      >
         <div className="max-w-4xl mx-auto px-4 w-full flex flex-col gap-6">
 
-          {/* Welcome state — visible when no chat is selected */}
-          <AnimatePresence>
-            {noChatSelected && (
+          {/* Single conversation view — crossfades cleanly between states */}
+          <AnimatePresence mode="wait">
+            {view === 'welcome' && (
               <motion.div
                 key="welcome"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.35 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.28 }}
                 className="flex-1 flex flex-col items-center justify-center text-center gap-4 min-h-[60vh]"
               >
                 <div className="w-16 h-16 rounded-2xl glow-neon-accent flex items-center justify-center mb-2">
-                  <Sparkles size={26} className="text-cyan-400" />
+                  <Sparkles size={26} className="text-[var(--color-aurora-1)]" />
                 </div>
-                <h1 className="text-4xl font-semibold text-white/90 tracking-tight">
+                <h1 className="text-4xl font-semibold text-[var(--color-text-primary)] tracking-tight">
                   ¿En qué puedo ayudarte?
                 </h1>
-                <p className="text-sm text-white/45 max-w-md leading-relaxed">
+                <p className="text-sm text-[var(--color-text-secondary)] max-w-md leading-relaxed">
                   El sistema experto analizará tu perfil y enriquecerá tu consulta
                   con inferencias Prolog personalizadas.
                 </p>
               </motion.div>
             )}
-          </AnimatePresence>
 
-          {/* Empty state — visible when chat exists but has no messages */}
-          <AnimatePresence>
-            {!noChatSelected && !hasMessages && (
+            {view === 'loading' && (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-6"
+              >
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex flex-col gap-5 py-4">
+                    <div className="flex justify-end pl-12">
+                      <Skeleton shape="block" width="45%" height={40} className="rounded-2xl" />
+                    </div>
+                    <div className="flex items-start gap-4 pr-4">
+                      <Skeleton shape="circle" width={32} height={32} />
+                      <div className="flex-1 flex flex-col gap-2 pt-1">
+                        <Skeleton shape="line" width="92%" />
+                        <Skeleton shape="line" width="78%" />
+                        <Skeleton shape="line" width="55%" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+
+            {view === 'empty' && (
               <motion.div
                 key="empty"
-                initial={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.28 }}
                 className="flex-1 flex flex-col items-center justify-center text-center gap-4 min-h-[60vh]"
               >
                 <div className="w-12 h-12 rounded-xl glow-cyan flex items-center justify-center mb-2">
-                  <Sparkles size={20} className="text-cyan-400" />
+                  <Sparkles size={20} className="text-[var(--color-aurora-1)]" />
                 </div>
-                <h2 className="text-3xl font-semibold text-white/80 tracking-tight">
+                <h2 className="text-3xl font-semibold text-[var(--color-text-primary)] tracking-tight">
                   ¿En qué puedo ayudarte?
                 </h2>
-                <p className="text-sm text-white/40 max-w-sm leading-relaxed">
+                <p className="text-sm text-[var(--color-text-secondary)] max-w-sm leading-relaxed">
                   Escribí tu consulta y el sistema experto la enriquecerá con tu perfil.
                 </p>
               </motion.div>
             )}
-          </AnimatePresence>
 
-          {/* Messages list including active virtual message in a single array to allow React reconciliation */}
-          {[...messages, ...(virtualMsg ? [virtualMsg] : [])].map((msg) => (
-            <MessageBubble
-              key={msg.messageId}
-              message={msg}
-              isVirtual={msg.messageId === virtualMsg?.messageId}
-              onVirtualComplete={msg.messageId === virtualMsg?.messageId ? handleVirtualComplete : undefined}
-            />
-          ))}
+            {view === 'content' && (
+              <motion.div
+                key={`content-${activeChatId ?? 'draft'}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col gap-6"
+              >
+                {displayMessages.map((msg) => (
+                  <MessageBubble
+                    key={msg.messageId}
+                    message={msg}
+                    isVirtual={msg.messageId === virtualMsg?.messageId}
+                    onVirtualComplete={msg.messageId === virtualMsg?.messageId ? handleVirtualComplete : undefined}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Error notifications */}
           <AnimatePresence>
@@ -256,11 +351,11 @@ export function ChatArea() {
                 exit={{ opacity: 0 }}
                 className="flex items-start gap-4 py-2"
               >
-                <div className="w-8 h-8 rounded-full bg-red-950/30 border border-red-500/20 flex items-center justify-center flex-shrink-0">
-                  <AlertCircle size={14} className="text-red-400" />
+                <div className="w-8 h-8 rounded-full bg-[var(--color-error)]/10 border border-[var(--color-error)]/25 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle size={14} className="text-[var(--color-error)]" />
                 </div>
-                <div className="flex-1 flex flex-col gap-3 rounded-xl border border-red-500/15 bg-red-500/05 px-4 py-3.5">
-                  <p className="text-sm text-red-300">{pipelineError}</p>
+                <div className="flex-1 flex flex-col gap-3 rounded-xl border border-[var(--color-error)]/20 bg-[var(--color-error)]/5 px-4 py-3.5">
+                  <p className="text-sm text-[var(--color-error)]">{pipelineError}</p>
                   <Button variant="danger" size="sm" onClick={resetPipeline} className="self-start">
                     Descartar
                   </Button>
@@ -277,7 +372,7 @@ export function ChatArea() {
       <div className="pb-6 pt-2 flex-shrink-0">
         <div className="max-w-4xl mx-auto px-4 w-full">
           <MessageInput onSubmit={handleSubmit} forceBusy={busy} />
-          <p className="text-center text-xs text-white/20 mt-2">
+          <p className="text-center text-xs text-[var(--color-text-muted)] mt-2">
             Enter para enviar · Shift+Enter para nueva línea
           </p>
         </div>

@@ -25,6 +25,19 @@
   --color-accent: rgba(255, 255, 255, 0.90);
   --color-accent-glow: rgba(255, 255, 255, 0.12);
 
+  /* Aurora identity — centralized signature palette (cyan → purple → pink → warm) */
+  --color-aurora-1: #06b6d4; /* cyan   */
+  --color-aurora-2: #a855f7; /* purple */
+  --color-aurora-3: #ec4899; /* pink   */
+  --color-aurora-4: #f97316; /* orange */
+  --color-aurora-5: #eab308; /* yellow */
+
+  /* Overlays / scrim for modals & drawers */
+  --color-scrim: rgba(0, 0, 0, 0.55);
+
+  /* Focus ring (a11y) — aurora-tinted */
+  --focus-ring: rgba(168, 85, 247, 0.55);
+
   /* Status */
   --color-error: #ff4d4d;
   --color-success: #4dff91;
@@ -78,6 +91,10 @@
   --glass-border: rgba(46, 52, 64, 0.08);
   --glass-shadow: 0 8px 32px rgba(46, 52, 64, 0.04);
 
+  /* Overlays / scrim — lighter veil on light canvas */
+  --color-scrim: rgba(46, 52, 64, 0.35);
+  --focus-ring: rgba(79, 70, 229, 0.55);
+
   /* Remapping base white/black variables for transparent utilities */
   --color-white: #0f172a;
   --color-black: #ffffff;
@@ -123,7 +140,7 @@
 }
 
 .aurora-active {
-  background: linear-gradient(135deg, #06b6d4, #a855f7, #ec4899, #06b6d4) !important;
+  background: linear-gradient(135deg, var(--color-aurora-1), var(--color-aurora-2), var(--color-aurora-3), var(--color-aurora-1)) !important;
   background-size: 300% 300% !important;
   animation: aurora-flow 6s ease infinite !important;
   color: #ffffff !important;
@@ -149,12 +166,12 @@
   padding: 1.5px;
   background: conic-gradient(
     from var(--aurora-angle),
-    rgba(6, 182, 212, 0.7),
-    rgba(168, 85, 247, 0.7),
-    rgba(236, 72, 153, 0.7),
-    rgba(249, 115, 22, 0.6),
-    rgba(234, 179, 8, 0.6),
-    rgba(6, 182, 212, 0.7)
+    var(--color-aurora-1),
+    var(--color-aurora-2),
+    var(--color-aurora-3),
+    var(--color-aurora-4),
+    var(--color-aurora-5),
+    var(--color-aurora-1)
   );
   animation: aurora-spin 8s linear infinite;
   box-shadow:
@@ -278,4 +295,50 @@ body {
 ::selection {
   background: rgba(168, 85, 247, 0.25);
   color: var(--color-text-primary);
+}
+
+/* ── Accessible focus ring (keyboard only) ────────────────── */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Mouse users keep the existing custom styles */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* El cajón de texto del chat ya marca el foco con su borde aurora animado:
+   suprimimos el focus-ring violeta solo ahí. */
+#message-input:focus,
+#message-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Skeleton (loading placeholders) ──────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-surface-3) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  .aurora-active,
+  .aurora-input-wrapper,
+  .glow-pulse { animation: none !important; }
 }

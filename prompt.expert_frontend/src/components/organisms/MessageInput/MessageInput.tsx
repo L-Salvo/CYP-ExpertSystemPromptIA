@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { Button } from '../../atoms/Button';
 import { useChatStore } from '../../../store/chat.store';
 
@@ -11,7 +11,7 @@ interface MessageInputProps {
 
 export function MessageInput({ onSubmit, forceBusy = false }: MessageInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { pipelineState } = useChatStore();
+  const { pipelineState, activeChatId } = useChatStore();
 
   const busy = forceBusy || pipelineState === 'enriching' || pipelineState === 'sending';
 
@@ -25,6 +25,12 @@ export function MessageInput({ onSubmit, forceBusy = false }: MessageInputProps)
   useEffect(() => {
     autoResize();
   }, []);
+
+  // Keep the input focused so the user can type immediately: on mount, when
+  // switching chats, and once the pipeline frees the input again.
+  useEffect(() => {
+    if (!busy) textareaRef.current?.focus();
+  }, [activeChatId, busy]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -57,7 +63,7 @@ export function MessageInput({ onSubmit, forceBusy = false }: MessageInputProps)
             onInput={autoResize}
             onKeyDown={handleKeyDown}
             className="flex-1 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]
-              resize-none outline-none leading-relaxed max-h-[160px] disabled:opacity-50"
+              resize-none outline-none focus-visible:outline-none leading-relaxed max-h-[160px] disabled:opacity-50"
             aria-label="Mensaje"
           />
           <Button
@@ -69,7 +75,7 @@ export function MessageInput({ onSubmit, forceBusy = false }: MessageInputProps)
             aria-label="Enviar mensaje"
             className="flex-shrink-0"
           >
-            <Send size={14} />
+            <ArrowUp size={16} strokeWidth={2.5} />
           </Button>
         </div>
       </div>

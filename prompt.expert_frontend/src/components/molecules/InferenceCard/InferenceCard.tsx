@@ -18,19 +18,19 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
       {/* Header */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="flex items-center gap-2 text-white/45 hover:text-white/70 transition-colors py-1 text-xs font-medium focus:outline-none cursor-pointer"
+        className="flex items-center gap-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors py-1 text-xs font-medium cursor-pointer"
         aria-expanded={expanded}
         id={`inference-card-toggle-${enrichData.messageId}`}
       >
-        <Brain size={13} className="text-cyan-500/80" />
+        <Brain size={13} className="text-[var(--color-aurora-1)]" />
         <span>Proceso de pensamiento (Prolog)</span>
-        <span className="text-white/20">•</span>
-        <span className="text-white/35 font-normal">
+        <span className="text-[var(--color-text-muted)]">•</span>
+        <span className="text-[var(--color-text-muted)] font-normal">
           {enrichData.appliedInferences.length} inferencias
         </span>
         <ChevronDown
           size={12}
-          className={`text-white/30 ml-1 transition-transform duration-200 ${
+          className={`text-[var(--color-text-muted)] ml-1 transition-transform duration-200 ${
             expanded ? 'rotate-180' : ''
           }`}
         />
@@ -43,11 +43,11 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
         }`}
       >
         <div className="overflow-hidden">
-          <div className="pl-4 pb-2 pt-2 flex flex-col gap-3.5 border-l border-white/08 ml-1.5 mt-1">
+          <div className="pl-4 pb-2 pt-2 flex flex-col gap-3.5 border-l border-[var(--color-border)] ml-1.5 mt-1">
             {/* Applied inferences */}
             {enrichData.appliedInferences.length > 0 && (
               <div>
-                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Inferencias aplicadas</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">Inferencias aplicadas</p>
                 <div className="flex flex-wrap gap-1.5">
                   {enrichData.appliedInferences.map((inf) => (
                     <Badge key={inf} variant="inference">{inf}</Badge>
@@ -58,9 +58,9 @@ export function InferenceCard({ enrichData, autoCollapsed = false, className = '
 
             {/* Enriched prompt */}
             <div>
-              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Prompt enriquecido</p>
-              <div className="border-l border-white/10 pl-3 py-1 bg-transparent">
-                <p className="text-xs text-white/50 leading-relaxed whitespace-pre-wrap font-mono">
+              <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">Prompt enriquecido</p>
+              <div className="border-l border-[var(--color-border-hover)] pl-3 py-1 bg-transparent">
+                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap font-mono">
                   {enrichData.enrichedPrompt}
                 </p>
               </div>

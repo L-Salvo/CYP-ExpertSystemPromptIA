@@ -61,9 +61,9 @@ export function ChatListItem({ chat }: ChatListItemProps) {
 
   return (
     <div
-      className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150
+      className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors duration-150
         ${isActive
-          ? 'aurora-active font-medium'
+          ? 'bg-[var(--color-surface-3)] text-[var(--color-text-primary)] font-medium'
           : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)]'
         }`}
       onClick={() => !renaming && setActiveChatId(chat.chatId)}
@@ -92,7 +92,7 @@ export function ChatListItem({ chat }: ChatListItemProps) {
           aria-label="Opciones del chat"
           onClick={() => setMenuOpen((o) => !o)}
           className={`p-1 rounded-md transition-all duration-100
-            ${menuOpen ? 'opacity-100 bg-[var(--color-surface-active)]' : 'opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface-active)]'}
+            ${menuOpen ? 'opacity-100 bg-[var(--color-surface-4)]' : 'opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface-4)]'}
           `}
         >
           <MoreHorizontal size={14} />
@@ -117,7 +117,7 @@ export function ChatListItem({ chat }: ChatListItemProps) {
               </button>
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
               >
                 <Trash2 size={13} />
                 Eliminar

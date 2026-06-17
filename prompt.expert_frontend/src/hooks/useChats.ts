@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getChats, createChat, renameChat, deleteChat } from '../api/chat.api';
+import { toast } from '../shared/ui';
 import type { CreateChatRequest, RenameChatRequest } from '../types/api.types';
 
 export const CHATS_KEY = ['chats'] as const;
@@ -32,6 +33,10 @@ export function useRenameChat() {
       renameChat(chatId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: CHATS_KEY });
+      toast.success('Conversación renombrada');
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err.message ?? 'No se pudo renombrar la conversación');
     },
   });
 }
@@ -43,6 +48,10 @@ export function useDeleteChat() {
     mutationFn: (chatId: number) => deleteChat(chatId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: CHATS_KEY });
+      toast.success('Conversación eliminada');
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err.message ?? 'No se pudo eliminar la conversación');
     },
   });
 }

@@ -3,11 +3,12 @@ import { Cpu, Brain } from 'lucide-react';
 import { InferenceCard } from '../InferenceCard';
 import { Badge } from '../../atoms/Badge';
 import { useChatStore } from '../../../store/chat.store';
+import { THINKING_STEP_DURATION_MS, RESPONSE_TYPEWRITER_SPEED_MS } from '../../../config/chat.config';
 import type { MessageResponse } from '../../../types/api.types';
 
 const animatedPrompts = new Set<string>();
 
-function TypewriterText({ text, speed = 15, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
+function TypewriterText({ text, speed = RESPONSE_TYPEWRITER_SPEED_MS, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
       interval = setInterval(() => {
         idx = (idx + 1) % steps.length;
         setCurrentStepText(steps[idx]);
-      }, 6000);
+      }, THINKING_STEP_DURATION_MS);
     } else if (pipelineState === 'sending') {
       const steps = [
         'Conectando con modelo de IA...',
@@ -100,7 +101,7 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
       interval = setInterval(() => {
         idx = (idx + 1) % steps.length;
         setCurrentStepText(steps[idx]);
-      }, 6000);
+      }, THINKING_STEP_DURATION_MS);
     } else {
       setCurrentStepText('');
     }
@@ -122,7 +123,7 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
     <div className="flex flex-col gap-5 py-4">
       {/* User message turn */}
       <div className="flex justify-end pl-12">
-        <div className="max-w-[75%] bg-white/06 text-white/95 rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
+        <div className="max-w-[75%] bg-[var(--color-surface-2)] text-[var(--color-text-primary)] rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
           <p className="text-[15px] leading-relaxed">{message.originalPrompt}</p>
         </div>
       </div>
@@ -130,8 +131,8 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
       {/* Assistant message turn */}
       <div className="flex items-start gap-4 pr-4">
         {/* Modern Sparkles/CPU Avatar */}
-        <div className="w-8 h-8 rounded-full bg-cyan-950/30 border border-cyan-500/20 flex items-center justify-center flex-shrink-0 shadow-sm shadow-cyan-500/05">
-          <Cpu size={14} className="text-cyan-400" />
+        <div className="w-8 h-8 rounded-full bg-[var(--color-aurora-1)]/10 border border-[var(--color-aurora-1)]/25 flex items-center justify-center flex-shrink-0">
+          <Cpu size={14} className="text-[var(--color-aurora-1)]" />
         </div>
 
         {/* Content Column */}
@@ -139,23 +140,23 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
           {isVirtual && !revealResponse ? (
             <div className="flex flex-col gap-3 w-full">
               {/* Dynamic thought process loader inside the assistant turn */}
-              <div className="flex items-center gap-2 text-white/45 text-xs font-medium py-1">
-                <Brain size={13} className="text-cyan-500/80 animate-pulse" />
+              <div className="flex items-center gap-2 text-[var(--color-text-secondary)] text-xs font-medium py-1">
+                <Brain size={13} className="text-[var(--color-aurora-1)] animate-pulse" />
                 <span>Proceso de pensamiento (Prolog)</span>
                 {message.appliedInferences.length > 0 && (
                   <>
-                    <span className="text-white/20">•</span>
-                    <span className="text-white/35 font-normal">
+                    <span className="text-[var(--color-text-muted)]">•</span>
+                    <span className="text-[var(--color-text-muted)] font-normal">
                       {message.appliedInferences.length} inferencias
                     </span>
                   </>
                 )}
               </div>
 
-              <div className="pl-4 pb-2 pt-1 flex flex-col gap-3.5 border-l border-white/08 ml-1.5 mt-0.5">
+              <div className="pl-4 pb-2 pt-1 flex flex-col gap-3.5 border-l border-[var(--color-border)] ml-1.5 mt-0.5">
                 <div className="flex items-center gap-2.5 min-h-[22px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping flex-shrink-0" />
-                  <span className="text-xs text-white/45 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-aurora-1)] animate-ping flex-shrink-0" />
+                  <span className="text-xs text-[var(--color-text-secondary)] font-mono">
                     {currentStepText}
                   </span>
                 </div>
@@ -177,7 +178,7 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
               {/* AI response text */}
               {message.aiResponse && (
                 <div className="flex flex-col gap-3">
-                  <div className="text-[15px] text-white/90 leading-relaxed whitespace-pre-wrap">
+                  <div className="text-[15px] text-[var(--color-text-primary)] leading-relaxed whitespace-pre-wrap">
                     {shouldAnimate && isVirtual ? (
                       <TypewriterText text={message.aiResponse} onComplete={onVirtualComplete} />
                     ) : (
