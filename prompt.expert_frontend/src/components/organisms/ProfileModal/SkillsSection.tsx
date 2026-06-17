@@ -1,14 +1,22 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Slider } from '../../atoms/Slider';
+import { CategoryFilter } from '../../atoms/CategoryFilter';
 import { Skeleton } from '../../../shared/ui';
 import { useSkillsCatalog } from '../../../hooks/useSkills';
 import { useProfile, useUpdateSkill } from '../../../hooks/useProfile';
 
 export function SkillsSection() {
-  const { data: catalog = [], isLoading } = useSkillsCatalog();
+  const { data: fullCatalog = [] } = useSkillsCatalog();
+  const [category, setCategory] = useState<string | undefined>(undefined);
+  const { data: catalog = [], isLoading } = useSkillsCatalog(category);
   const { data: profile } = useProfile();
   const { mutate: updateSkill } = useUpdateSkill();
+
+  const categories = useMemo(
+    () => Array.from(new Set(fullCatalog.map((s) => s.category))).sort(),
+    [fullCatalog],
+  );
 
   const [levels, setLevels] = useState<Record<number, number>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -31,6 +39,7 @@ export function SkillsSection() {
       <p className="text-xs text-[var(--color-text-muted)]">
         Ajustá tu nivel en cada tecnología. El sistema experto lo usa para adaptar las respuestas.
       </p>
+      <CategoryFilter categories={categories} active={category} onChange={setCategory} />
       {isLoading
         ? Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-2">

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Cpu, Brain } from 'lucide-react';
+import { Cpu, Brain, RotateCcw } from 'lucide-react';
 import { InferenceCard } from '../InferenceCard';
 import { Badge } from '../../atoms/Badge';
 import { useChatStore } from '../../../store/chat.store';
+import { useRetryMessage } from '../../../hooks/useChat';
 import { THINKING_STEP_DURATION_MS, RESPONSE_TYPEWRITER_SPEED_MS } from '../../../config/chat.config';
 import type { MessageResponse } from '../../../types/api.types';
 
@@ -42,6 +43,7 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, isVirtual = false, onVirtualComplete }: MessageBubbleProps) {
   const { pipelineState } = useChatStore();
   const [currentStepText, setCurrentStepText] = useState('');
+  const { mutate: retryMessage, isPending: isRetrying } = useRetryMessage();
 
   // Local state for coordinating the response display for virtual messages
   const [revealResponse, setRevealResponse] = useState(!isVirtual || !!message.aiResponse);
@@ -129,7 +131,7 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
       </div>
 
       {/* Assistant message turn */}
-      <div className="flex items-start gap-4 pr-4">
+      <div className="group flex items-start gap-4 pr-4">
         {/* Modern Sparkles/CPU Avatar */}
         <div className="w-8 h-8 rounded-full bg-[var(--color-aurora-1)]/10 border border-[var(--color-aurora-1)]/25 flex items-center justify-center flex-shrink-0">
           <Cpu size={14} className="text-[var(--color-aurora-1)]" />
@@ -185,6 +187,20 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
                       message.aiResponse
                     )}
                   </div>
+
+                  {!(shouldAnimate && isVirtual) && (
+                    <button
+                      type="button"
+                      title="Reintentar respuesta"
+                      disabled={isRetrying}
+                      onClick={() => retryMessage(message.messageId)}
+                      className={`flex items-center gap-1.5 self-start text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+                        ${isRetrying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    >
+                      <RotateCcw size={12} className={isRetrying ? 'animate-spin' : ''} />
+                      {isRetrying ? 'Regenerando...' : 'Reintentar'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

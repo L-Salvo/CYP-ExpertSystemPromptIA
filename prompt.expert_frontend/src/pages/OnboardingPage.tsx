@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Briefcase, GraduationCap, Check } from 'lucide-react';
 import { Button } from '../components/atoms/Button';
 import { Slider } from '../components/atoms/Slider';
+import { CategoryFilter } from '../components/atoms/CategoryFilter';
 import { Input, Skeleton } from '../shared/ui';
 import { OptionCard } from '../components/onboarding/OptionCard';
 import { OnboardingProgress } from '../components/onboarding/OnboardingProgress';
@@ -18,8 +19,15 @@ const STEPS = ['Educación', 'Experiencia', 'Skills'];
 export function OnboardingPage() {
   const navigate = useNavigate();
   const user = useSessionStore((s) => s.user);
-  const { data: catalog = [], isLoading: loadingCatalog } = useSkillsCatalog();
+  const { data: fullCatalog = [] } = useSkillsCatalog();
+  const [skillCategory, setSkillCategory] = useState<string | undefined>(undefined);
+  const { data: catalog = [], isLoading: loadingCatalog } = useSkillsCatalog(skillCategory);
   const { mutate: submitOnboarding, isPending: submitting } = useOnboarding();
+
+  const categories = useMemo(
+    () => Array.from(new Set(fullCatalog.map((s) => s.category))).sort(),
+    [fullCatalog],
+  );
 
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -180,6 +188,11 @@ export function OnboardingPage() {
                       {selectedSkillCount} seleccionada{selectedSkillCount === 1 ? '' : 's'}
                     </span>
                   </h2>
+                  <CategoryFilter
+                    categories={categories}
+                    active={skillCategory}
+                    onChange={setSkillCategory}
+                  />
                   <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1">
                     {loadingCatalog
                       ? Array.from({ length: 5 }).map((_, i) => (
