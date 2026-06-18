@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Cpu, Brain, RotateCcw } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { InferenceCard } from '../InferenceCard';
 import { Badge } from '../../atoms/Badge';
 import { useChatStore } from '../../../store/chat.store';
@@ -31,7 +32,11 @@ function TypewriterText({ text, speed = RESPONSE_TYPEWRITER_SPEED_MS, onComplete
     return () => clearInterval(interval);
   }, [text, speed, onComplete]);
 
-  return <>{displayedText}</>;
+  return (
+    <div className="markdown-prose">
+      <ReactMarkdown>{displayedText}</ReactMarkdown>
+    </div>
+  );
 }
 
 interface MessageBubbleProps {
@@ -180,11 +185,13 @@ export function MessageBubble({ message, isVirtual = false, onVirtualComplete }:
               {/* AI response text */}
               {message.aiResponse && (
                 <div className="flex flex-col gap-3">
-                  <div className="text-[15px] text-[var(--color-text-primary)] leading-relaxed whitespace-pre-wrap">
+                  <div className="leading-relaxed">
                     {shouldAnimate && isVirtual ? (
                       <TypewriterText text={message.aiResponse} onComplete={onVirtualComplete} />
                     ) : (
-                      message.aiResponse
+                      <div className="markdown-prose">
+                        <ReactMarkdown>{message.aiResponse}</ReactMarkdown>
+                      </div>
                     )}
                   </div>
 

@@ -34,48 +34,108 @@ export function SkillsSection() {
     );
   }
 
+  const mySkills = useMemo(() => {
+    return catalog.filter((skill) =>
+      profile?.skills.some((s) => s.skillId === skill.skillId)
+    );
+  }, [catalog, profile]);
+
+  const availableSkills = useMemo(() => {
+    return catalog.filter((skill) =>
+      !profile?.skills.some((s) => s.skillId === skill.skillId)
+    );
+  }, [catalog, profile]);
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <p className="text-xs text-[var(--color-text-muted)]">
         Ajustá tu nivel en cada tecnología. El sistema experto lo usa para adaptar las respuestas.
       </p>
+      
       <CategoryFilter categories={categories} active={category} onChange={setCategory} />
-      {isLoading
-        ? Array.from({ length: 5 }).map((_, i) => (
+      
+      {isLoading ? (
+        <div className="flex flex-col gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-2">
               <Skeleton shape="line" width={120} />
               <Skeleton shape="line" height={8} />
             </div>
-          ))
-        : catalog.map((skill) => {
-            const inProfile = profile?.skills.some((s) => s.skillId === skill.skillId);
-            return (
-              <div key={skill.skillId} className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">{skill.name}</span>
-                    {!inProfile && (
-                      <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">nueva</span>
-                    )}
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {/* SECCIÓN: MIS HABILIDADES */}
+          <div className="flex flex-col gap-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-primary)] border-b border-[var(--color-border)] pb-2">
+              Mis Habilidades ({mySkills.length})
+            </h4>
+            {mySkills.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-muted)] italic py-2">
+                No tenés habilidades seleccionadas en esta categoría.
+              </p>
+            ) : (
+              mySkills.map((skill) => (
+                <div key={skill.skillId} className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                      {skill.name}
+                    </span>
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      loading={savingId === skill.skillId}
+                      onClick={() => save(skill.skillId)}
+                    >
+                      Guardar
+                    </Button>
                   </div>
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    loading={savingId === skill.skillId}
-                    onClick={() => save(skill.skillId)}
-                  >
-                    Guardar
-                  </Button>
+                  <Slider
+                    id={`profile-slider-${skill.skillId}`}
+                    value={currentLevel(skill.skillId)}
+                    onChange={(v) => setLevels((prev) => ({ ...prev, [skill.skillId]: v }))}
+                  />
                 </div>
-                <Slider
-                  id={`profile-slider-${skill.skillId}`}
-                  value={currentLevel(skill.skillId)}
-                  onChange={(v) => setLevels((prev) => ({ ...prev, [skill.skillId]: v }))}
-                />
-                <div className="border-b border-[var(--color-border)]" />
-              </div>
-            );
-          })}
+              ))
+            )}
+          </div>
+
+          {/* SECCIÓN: DISPONIBLES PARA AGREGAR */}
+          <div className="flex flex-col gap-4 mt-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] border-b border-[var(--color-border)] pb-2">
+              Habilidades Disponibles ({availableSkills.length})
+            </h4>
+            {availableSkills.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-muted)] italic py-2">
+                No hay más habilidades disponibles en esta categoría.
+              </p>
+            ) : (
+              availableSkills.map((skill) => (
+                <div key={skill.skillId} className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-[var(--color-text-muted)]">
+                      {skill.name}
+                    </span>
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      loading={savingId === skill.skillId}
+                      onClick={() => save(skill.skillId)}
+                    >
+                      Agregar
+                    </Button>
+                  </div>
+                  <Slider
+                    id={`profile-slider-${skill.skillId}`}
+                    value={currentLevel(skill.skillId)}
+                    onChange={(v) => setLevels((prev) => ({ ...prev, [skill.skillId]: v }))}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
